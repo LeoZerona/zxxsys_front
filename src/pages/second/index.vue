@@ -107,6 +107,23 @@
             <div class="context-item" @click="closeAll">关闭所有</div>
           </div>
         </Teleport>
+
+        <el-dropdown
+          trigger="contextmenu"
+          ref="contextDropdown"
+          popper-class="tabs-context-menu"
+          :popper-options="popperOptions"
+        >
+          <!-- 占位节点，真正位置由 popper-options 提供 -->
+          <span class="context-trigger"></span>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="closeOthers">关闭其他</el-dropdown-item>
+              <el-dropdown-item @click="closeRight">关闭右侧</el-dropdown-item>
+              <el-dropdown-item @click="closeAll">关闭所有</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </nav>
 
       <!-- 页面主体 -->
