@@ -1,0 +1,54 @@
+/* 2. 定义“安全高度”变量 --------------------------------------------------*/
+:root {
+    /* ① 最保守：small viewport height（iOS、Android 新版都支持） */
+    --vh: 100svh;
+  }
+  
+  /* ② 如果浏览器支持最新的动态视口规范，就用 dvh（更精准） */
+  @supports (height: 100dvh) {
+    :root {
+      --vh: 100dvh;
+    }
+  }
+  
+  /* ③ 旧 PC 浏览器（既不支持 svh 也不支持 dvh）的兜底：传统 100vh */
+  @supports not (height: 100svh) {
+    :root {
+      --vh: 100vh;
+    }
+  }
+
+  /* 尺寸变量 */
+$sideBarWidth: 240px;              // 左侧菜单宽度
+$headerHeight: 60px;               // 顶部导航栏高度
+$tabsBarHeight: 40px;              // 标签栏高度
+$contentBg: #f5f7fa;               // 主内容区背景色
+
+/* 菜单配色 */
+$menuBg: #304156;                  // 菜单背景色
+$menuDarkBg: #263445;              // 菜单 logo 区深色背景
+$menuText: #bfcbd9;                // 菜单文字默认色
+$menuHover: #263445;               // 菜单 hover 背景色
+$menuActiveBg: #1890ff;            // 菜单激活背景色
+$menuActiveText: #ffffff;          // 菜单激活文字色
+
+/* 顶部导航 */
+$headerBg: #ffffff;                // 顶部栏背景
+$headerShadow: 0 2px 4px rgba(0, 0, 0, 0.08); // 顶部栏阴影
+
+/* 标签栏 */
+$tabsBarBorder: #e6e6e6;           // 标签栏下边框色
+$tabsBarShadow: 0 1px 3px rgba(0, 0, 0, 0.05); // 标签栏阴影
+$tabsItemHeight: 32px;             // 标签高度
+$tabsItemPadding: 0 12px;          // 标签左右内边距
+$tabsFontSize: 12px;               // 标签字号
+$tabsDefaultColor: #666;           // 标签默认文字色
+$tabsActiveBg: $menuActiveBg;      // 标签激活背景（复用菜单激活色）
+$tabsActiveColor: #ffffff;         // 标签激活文字色
+
+/* 表格 / 卡片 */
+$cardBg: #ffffff;                  // 卡片背景色
+$cardShadow: 0 2px 4px rgba(0, 0, 0, 0.05); // 卡片阴影
+
+/* 响应式断点 */
+$mobile: 768px;                    // 移动端断点

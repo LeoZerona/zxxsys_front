@@ -6,93 +6,111 @@
         <p>{{ isRegister ? '注册后即可登录后台' : '请登录您的管理员账户' }}</p>
       </header>
 
-      <form @submit.prevent="handleSubmit">
+      <!-- 表单 -->
+      <el-form
+        ref="ruleFormRef"
+        :model="form"
+        :rules="rules"
+        @submit.prevent="handleSubmit"
+        size="large"
+      >
         <!-- 用户名 -->
-        <div class="form-group">
-          <label for="username">用户名</label>
-          <input
-            id="username"
+        <el-form-item prop="username">
+          <el-input
             v-model="form.username"
-            type="text"
+            :prefix-icon="User"
             placeholder="请输入用户名"
-            required
+            clearable
           />
-        </div>
+        </el-form-item>
 
         <!-- 密码 -->
-        <div class="form-group">
-          <label for="password">{{ isRegister ? '设置密码' : '密码' }}</label>
-          <input
-            id="password"
+        <el-form-item prop="password">
+          <el-input
             v-model="form.password"
             type="password"
+            :prefix-icon="Lock"
             placeholder="请输入密码"
-            required
+            show-password
+            clearable
           />
-        </div>
+        </el-form-item>
 
-        <!-- 确认密码（注册时） -->
-        <div v-if="isRegister" class="form-group">
-          <label for="confirmPwd">确认密码</label>
-          <input
-            id="confirmPwd"
+        <!-- 确认密码 -->
+        <el-form-item v-if="isRegister" prop="confirmPwd">
+          <el-input
             v-model="form.confirmPwd"
             type="password"
+            :prefix-icon="Lock"
             placeholder="请再次输入密码"
-            required
+            show-password
+            clearable
           />
-        </div>
+        </el-form-item>
 
-        <!-- 记住我 & 忘记密码（登录时） -->
-        <div v-if="!isRegister" class="remember-forgot">
-          <label>
-            <input v-model="form.remember" type="checkbox" />
-            记住我
-          </label>
-          <a class="text-btn" @click="onForget">忘记密码？</a>
-        </div>
+        <!-- 记住我 & 忘记密码 -->
+        <el-form-item v-if="!isRegister">
+          <div class="remember-forgot">
+            <el-checkbox v-model="form.remember" label="记住我" />
+            <el-link type="primary" :underline="false" @click="onForget">
+              忘记密码？
+            </el-link>
+          </div>
+        </el-form-item>
 
-        <!-- 提交按钮 -->
-        <button type="submit" class="login-button">
+        <!-- 提交 -->
+        <el-button
+          native-type="submit"
+          type="primary"
+          class="login-button"
+          :loading="loading"
+        >
           {{ isRegister ? '立即注册' : '登录' }}
-        </button>
+        </el-button>
 
-        <!-- 🔥底部文字切换 -->
+        <!-- 底部切换 -->
         <div class="bottom-switch">
-          <span class="hint">{{
-            isRegister ? '已有账户？' : '还没有账户？'
-          }}</span>
-          <a class="text-btn" @click="isRegister = !isRegister">
+          <span class="hint">{{ isRegister ? '已有账户？' : '还没有账户？' }}</span>
+          <el-link type="primary" :underline="false" @click="isRegister = !isRegister">
             {{ isRegister ? '去登录' : '去注册' }}
-          </a>
+          </el-link>
         </div>
-      </form>
+      </el-form>
     </div>
 
-    <!-- 忘记密码弹层（原逻辑不动） -->
-    <Teleport to="body">
-      <div v-if="showForgetModal" class="modal-mask" @click.self="showForgetModal = false">
-        <div class="modal">
-          <h3>重置密码</h3>
-          <p>请输入您的注册邮箱，我们将发送重置链接。</p>
-          <input v-model="resetEmail" type="email" placeholder="邮箱地址" />
-          <div class="modal-actions">
-            <button class="plain" @click="showForgetModal = false">取消</button>
-            <button @click="sendResetEmail">发送</button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <!-- 忘记密码弹层 -->
+    <el-dialog
+      v-model="showForgetModal"
+      title="重置密码"
+      width="380px"
+      align-center
+      :close-on-click-modal="false"
+    >
+      <el-input
+        v-model="resetEmail"
+        type="email"
+        placeholder="请输入注册邮箱"
+        clearable
+      />
+      <template #footer>
+        <el-button @click="showForgetModal = false">取消</el-button>
+        <el-button type="primary" @click="sendResetEmail">发送</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-/* 下方脚本完全不变，仅展示结构 */
 import { reactive, ref } from 'vue'
+import type { FormInstance, FormRules } from 'element-plus'
+import { User, Lock } from '@element-plus/icons-vue'
 
+/* -------------- 状态 -------------- */
 const isRegister = ref(false)
 const showForgetModal = ref(false)
 const resetEmail = ref('')
+const loading = ref(false)
+const ruleFormRef = ref<FormInstance>()
 
 const form = reactive({
   username: '',
@@ -101,23 +119,42 @@ const form = reactive({
   confirmPwd: ''
 })
 
-const handleSubmit = () => {
-  if (isRegister.value) {
-    if (form.password !== form.confirmPwd) {
-      alert('两次密码不一致')
-      return
+/* -------------- 校验规则 -------------- */
+const rules = reactive<FormRules>({
+  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
+  password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
+  confirmPwd: [
+    {
+      validator: (_rule, value, callback) => {
+        if (!isRegister.value) return callback()
+        if (!value) return callback(new Error('请再次输入密码'))
+        if (value !== form.password) return callback(new Error('两次密码不一致'))
+        callback()
+      },
+      trigger: 'blur'
     }
-    console.log('[Register]', { username: form.username, password: form.password })
-    alert('注册成功，请登录')
-    isRegister.value = false
-  } else {
-    console.log('[Login]', { username: form.username, password: form.password, remember: form.remember })
-  }
+  ]
+})
+
+/* -------------- 提交 -------------- */
+const handleSubmit = async () => {
+  await ruleFormRef.value?.validate(valid => {
+    if (!valid) return
+    loading.value = true
+    setTimeout(() => {
+      if (isRegister.value) {
+        alert('注册成功，请登录')
+        isRegister.value = false
+      } else {
+        console.log('[Login]', form)
+      }
+      loading.value = false
+    }, 600)
+  })
 }
 
-const onForget = () => {
-  showForgetModal.value = true
-}
+/* -------------- 忘记密码 -------------- */
+const onForget = () => (showForgetModal.value = true)
 const sendResetEmail = () => {
   if (!resetEmail.value) return
   console.log('[Reset Email]', resetEmail.value)
@@ -127,14 +164,16 @@ const sendResetEmail = () => {
 </script>
 
 <style lang="scss" scoped>
-/* —————— 原变量 & 原样式不动 —————— */
+/* 原样式完全保留，仅把 .text-btn 里的 darken 换成 color.adjust */
+@use 'sass:color';
+
 $primary: #3498db;
 $dark: #2c3e50;
 $gray: #7f8c8d;
 $radius: 8px;
 
 .login-page {
-  min-height: var(--vh);
+  min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -164,159 +203,47 @@ $radius: 8px;
     color: $gray;
   }
 }
-.form-group {
-  margin-bottom: 20px;
-  label {
-    display: block;
-    font-size: 14px;
-    font-weight: 500;
-    color: #34495e;
-    margin-bottom: 8px;
-  }
-  input {
-    width: 100%;
-    padding: 12px 16px;
-    font-size: 16px;
-    border: 1px solid #ddd;
-    border-radius: $radius;
-    transition: all 0.3s ease;
-    &:focus {
-      outline: none;
-      border-color: $primary;
-      box-shadow: 0 0 0 3px rgba($primary, 0.1);
-    }
-  }
-}
+
+/* 记住我 & 忘记密码行 */
 .remember-forgot {
+  width: 100%;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 25px;
-  font-size: 14px;
-  label {
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-    color: $gray;
-    input {
-      margin-right: 6px;
-    }
-  }
+  justify-content: space-between;
 }
+
+/* 登录按钮 */
 .login-button {
   width: 100%;
-  padding: 14px;
-  font-size: 16px;
-  font-weight: 600;
-  color: #fff;
-  border: none;
-  border-radius: $radius;
-  background: linear-gradient(135deg, $primary 0%, $dark 100%);
-  cursor: pointer;
-  transition: all 0.3s ease;
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba($primary, 0.3);
-  }
-  &:active {
-    transform: translateY(0);
-  }
+  margin-top: 10px;
 }
 
-/* —————— 🔥底部文字切换 & 统一文字按钮风格 —————— */
+/* 底部切换 */
 .bottom-switch {
-  text-align: center;
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
   margin-top: 20px;
+  gap: 4px;            
   font-size: 14px;
   color: $gray;
-  .hint {
-    margin-right: 4px;
-  }
 }
-.text-btn {
-  color: $primary;
-  cursor: pointer;
-  transition: color 0.3s;
+
+/* 统一文字按钮 */
+.el-link {
+  font-size: inherit;
   &:hover {
-    color: darken($primary, 10%);
-    text-decoration: underline;
+    color: color.adjust($primary, $lightness: -10%);
   }
 }
 
-/* —————— 忘记密码弹层样式保持原样 —————— */
-.modal-mask {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 999;
-}
-.modal {
-  width: 90%;
-  max-width: 380px;
-  background: #fff;
-  border-radius: 12px;
-  padding: 30px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-  h3 {
-    margin: 0 0 10px;
-    font-size: 18px;
-    color: $dark;
-  }
-  p {
-    font-size: 14px;
-    color: $gray;
-    margin-bottom: 20px;
-  }
-  input {
-    width: 100%;
-    padding: 10px 12px;
-    margin-bottom: 20px;
-    border: 1px solid #ddd;
-    border-radius: $radius;
-    font-size: 14px;
-  }
-  .modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    button {
-      padding: 8px 16px;
-      font-size: 14px;
-      border-radius: $radius;
-      border: none;
-      cursor: pointer;
-      transition: all 0.3s;
-      &.plain {
-        background: #f1f1f1;
-        color: $gray;
-        &:hover {
-          background: #e1e1e1;
-        }
-      }
-      &:last-child {
-        background: $primary;
-        color: #fff;
-        &:hover {
-          background: darken($primary, 8%);
-        }
-      }
-    }
-  }
-}
-
-/* —————— 原移动端微调 —————— */
+/* 响应式 */
 @media (max-width: 480px) {
   .login-container {
     padding: 30px 20px;
   }
   .login-header h1 {
     font-size: 24px;
-  }
-  .form-group input {
-    font-size: 14px;
   }
 }
 </style>

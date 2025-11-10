@@ -1,0 +1,7 @@
+@forward 'element-plus/theme-chalk' with (
+  $colors: (
+    'primary': (
+      'base': #your-color,
+    ),
+  ),
+);
