@@ -70,15 +70,6 @@
                   <ArrowDown />
                 </el-icon>
               </span>
-              <!-- <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item>个人中心</el-dropdown-item>
-                  <el-dropdown-item>修改密码</el-dropdown-item>
-                  <el-dropdown-item divided @click="handleLogout">
-                    退出登录
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template> -->
 
               <template #dropdown>
                 <el-dropdown-menu>
@@ -132,7 +123,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, h } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import {
   Monitor,
@@ -141,14 +132,6 @@ import {
   ArrowDown,
   Lock,
   SwitchButton,
-  Refresh,
-  Close,
-  CircleClose,
-  Minus,
-  Menu,
-  Setting,
-  HomeFilled,
-  UserFilled,
 } from "@element-plus/icons-vue";
 import { nextTick } from "vue";
 
@@ -248,6 +231,8 @@ watch(
 
 /* 显示菜单 */
 function showContextMenu(e: MouseEvent, tabName: string) {
+  console.log("改标签触发右键事件");
+
   e.preventDefault(); // 阻止原生右键菜单
   rightClickTab = tabName;
   contextMenuX.value = e.clientX;
@@ -261,26 +246,6 @@ function showContextMenu(e: MouseEvent, tabName: string) {
   });
 }
 
-/* 三个关闭逻辑 */
-function closeOthers() {
-  visitedTabs.value = visitedTabs.value.filter((t) => t.name === rightClickTab);
-  activeTab.value = rightClickTab;
-  router.push({ name: rightClickTab });
-  contextMenuVisible.value = false;
-}
-function closeRight() {
-  const idx = visitedTabs.value.findIndex((t) => t.name === rightClickTab);
-  visitedTabs.value = visitedTabs.value.slice(0, idx + 1);
-  activeTab.value = rightClickTab;
-  router.push({ name: rightClickTab });
-  contextMenuVisible.value = false;
-}
-function closeAll() {
-  visitedTabs.value = [{ name: "dashboard", title: "仪表盘" }];
-  activeTab.value = "dashboard";
-  router.push({ name: "dashboard" });
-  contextMenuVisible.value = false;
-}
 function onTabsContextmenu(e: MouseEvent) {
   /* 真正被右键的元素是 .el-tabs__item */
   const item = (e.target as HTMLElement).closest(".el-tabs__item");
@@ -463,11 +428,6 @@ function onTabsContextmenu(e: MouseEvent) {
   margin: 10px;
   overflow-y: auto;
   background-color: $contentBg;
-
-  // padding: 0;
-  // background-color: #fff;
-  // border-radius: 4px;
-  // overflow: hidden;
 }
 
 @media (max-width: 768px) {
