@@ -3,7 +3,7 @@
     <!-- 左侧菜单栏 -->
     <el-aside :width="menuCollapse ? '64px' : '220px'" class="aside-menu">
       <div class="logo-container" :class="{ collapsed: menuCollapse }">
-        <img src="@/assets/logo.png" alt="logo" class="logo" />
+        <!-- <img src="@/assets/logo.png" alt="logo" class="logo" /> -->
         <span v-show="!menuCollapse" class="logo-text">管理系统</span>
       </div>
 
@@ -83,18 +83,20 @@
               <div class="user-info-trigger">
                 <el-avatar :size="32" :src="userInfo.avatar" />
                 <span class="username">{{ userInfo.name }}</span>
-                <el-icon><ArrowDown /></el-icon>
+                <el-icon>
+                  <ArrowDown />
+                </el-icon>
               </div>
               <template #dropdown>
                 <el-dropdown-menu>
                   <el-dropdown-item command="profile">
-                    <el-icon><User /></el-icon>个人中心
+                    <el-icon> <User /> </el-icon>个人中心
                   </el-dropdown-item>
                   <el-dropdown-item command="password">
-                    <el-icon><Lock /></el-icon>修改密码
+                    <el-icon> <Lock /> </el-icon>修改密码
                   </el-dropdown-item>
                   <el-dropdown-item command="logout" divided>
-                    <el-icon><SwitchButton /></el-icon>退出登录
+                    <el-icon> <SwitchButton /> </el-icon>退出登录
                   </el-dropdown-item>
                 </el-dropdown-menu>
               </template>
@@ -106,24 +108,14 @@
         <div class="tabs-container">
           <el-scrollbar class="tabs-scrollbar" ref="tabsScrollbarRef">
             <div class="tabs-wrapper">
-              <!-- 使用 el-dropdown 实现右键菜单 -->
-              <el-dropdown
+              <ContextMenu
                 v-for="tag in visitedViews"
                 :key="tag.path"
-                trigger="contextmenu"
-                :popper-options="{
-                  modifiers: [
-                    {
-                      name: 'offset',
-                      options: {
-                        offset: [0, 0],
-                      },
-                    },
-                  ],
-                }"
-                @visible-change="
-                  (visible) => handleContextMenuVisible(visible, tag)
-                "
+                :tag="tag"
+                @refresh="refreshTab"
+                @close="closeTag"
+                @closeOther="closeOtherTabs"
+                @closeAll="closeAllTabs"
               >
                 <el-tag
                   :closable="!tag.affix"
@@ -137,29 +129,11 @@
                   </el-icon>
                   {{ tag.title }}
                 </el-tag>
-
-                <!-- 右键菜单内容 -->
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item @click="refreshTab(tag)">
-                      <el-icon><Refresh /></el-icon>刷新当前
-                    </el-dropdown-item>
-                    <el-dropdown-item v-if="!tag.affix" @click="closeTag(tag)">
-                      <el-icon><Close /></el-icon>关闭当前
-                    </el-dropdown-item>
-                    <el-dropdown-item @click="closeOtherTabs(tag)">
-                      <el-icon><CircleClose /></el-icon>关闭其他
-                    </el-dropdown-item>
-                    <el-dropdown-item @click="closeAllTabs">
-                      <el-icon><Minus /></el-icon>关闭所有
-                    </el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
+              </ContextMenu>
             </div>
           </el-scrollbar>
 
-          <!-- 标签操作 -->
+          <!-- 标签操作下拉 -->
           <el-dropdown @command="handleTagCommand" class="tabs-action">
             <el-icon class="tabs-action-icon"><ArrowDown /></el-icon>
             <template #dropdown>
@@ -245,6 +219,7 @@
 </template>
 
 <script setup lang="ts">
+import ContextMenu from "./ContextMenu.vue";
 import { ref, computed, watch, nextTick, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {

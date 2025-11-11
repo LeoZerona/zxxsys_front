@@ -16,6 +16,11 @@ const router = createRouter({
       name: "second",
       component: () => import("@/pages/second/index.vue"),
     },
+    {
+      path: "/test",
+      name: "test",
+      component: () => import("@/pages/second/asd.vue"),
+    },
     // {
     //   path: "/:pathMatch(.*)*",
     //   name: "not-found",

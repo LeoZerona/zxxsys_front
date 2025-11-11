@@ -1,6 +1,7 @@
 <!-- AdminLayout.vue (含标签栏) -->
 <template>
   <div class="admin-container">
+    <!-- 顶部头部 -->
     <!-- 侧边栏 -->
     <aside class="sidebar">
       <div class="logo">后台管理系统</div>
@@ -13,13 +14,17 @@
         @select="handleMenuSelect"
       >
         <el-menu-item index="dashboard">
-          <el-icon><Monitor /></el-icon>
+          <el-icon>
+            <Monitor />
+          </el-icon>
           <span>仪表盘</span>
         </el-menu-item>
 
         <el-sub-menu index="user">
           <template #title>
-            <el-icon><User /></el-icon>
+            <el-icon>
+              <User />
+            </el-icon>
             <span>用户管理</span>
           </template>
           <el-menu-item index="user-list">用户列表</el-menu-item>
@@ -28,7 +33,9 @@
 
         <el-sub-menu index="content">
           <template #title>
-            <el-icon><Document /></el-icon>
+            <el-icon>
+              <Document />
+            </el-icon>
             <span>内容管理</span>
           </template>
           <el-menu-item index="article-list">文章列表</el-menu-item>
@@ -36,7 +43,9 @@
         </el-sub-menu>
 
         <el-menu-item index="settings">
-          <el-icon><Setting /></el-icon>
+          <el-icon>
+            <Setting />
+          </el-icon>
           <span>系统设置</span>
         </el-menu-item>
       </el-menu>
@@ -46,86 +55,74 @@
     <main class="main-content">
       <!-- 顶部导航栏 -->
       <header class="header">
-        <el-breadcrumb separator="/" class="breadcrumb">
-          <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
-          <el-breadcrumb-item>{{ currentPageTitle }}</el-breadcrumb-item>
-        </el-breadcrumb>
+        <div class="header-top">
+          <el-breadcrumb separator="/" class="breadcrumb">
+            <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
+            <el-breadcrumb-item>{{ currentPageTitle }}</el-breadcrumb-item>
+          </el-breadcrumb>
 
-        <div class="user-info">
-          <el-dropdown>
-            <span class="el-dropdown-link">
-              <el-icon><UserFilled /></el-icon>
-              管理员
-              <el-icon class="el-icon--right"><ArrowDown /></el-icon>
-            </span>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item>个人中心</el-dropdown-item>
-                <el-dropdown-item>修改密码</el-dropdown-item>
-                <el-dropdown-item divided @click="handleLogout">
-                  退出登录
-                </el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
-        </div>
-      </header>
-
-      <!-- 标签栏 -->
-      <nav class="tabs-bar">
-        <el-tabs
-          v-model="activeTab"
-          type="card"
-          closable
-          @tab-click="handleTabClick"
-          @tab-remove="handleTabClose"
-          @contextmenu.prevent="onTabsContextmenu"
-        >
-          <el-tab-pane
-            v-for="tab in visitedTabs"
-            :key="tab.name"
-            :name="tab.name"
-            @contextmenu.prevent="showContextMenu($event, tab.name)"
-          >
-            <template #label>
-              <span :class="{ 'active-dot': tab.name === activeTab }">
-                {{ tab.title }}
+          <div class="user-info">
+            <el-dropdown>
+              <span class="el-dropdown-link">
+                <el-avatar :size="32" :src="userInfo.avatar" />
+                管理员
+                <el-icon class="el-icon--right">
+                  <ArrowDown />
+                </el-icon>
               </span>
-            </template>
-          </el-tab-pane>
-        </el-tabs>
-        <!-- 右键浮动菜单 -->
-        <Teleport to="body">
-          <div
-            v-if="contextMenuVisible"
-            class="context-menu"
-            :style="{ left: contextMenuX + 'px', top: contextMenuY + 'px' }"
-            @mouseleave="contextMenuVisible = false"
-          >
-            <div class="context-item" @click="closeOthers">关闭其他</div>
-            <div class="context-item" @click="closeRight">关闭右侧</div>
-            <div class="context-item" @click="closeAll">关闭所有</div>
+              <!-- <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item>个人中心</el-dropdown-item>
+                  <el-dropdown-item>修改密码</el-dropdown-item>
+                  <el-dropdown-item divided @click="handleLogout">
+                    退出登录
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template> -->
+
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="profile">
+                    <el-icon> <User /> </el-icon>个人中心
+                  </el-dropdown-item>
+                  <el-dropdown-item command="password">
+                    <el-icon> <Lock /> </el-icon>修改密码
+                  </el-dropdown-item>
+                  <el-dropdown-item command="logout" divided>
+                    <el-icon> <SwitchButton /> </el-icon>退出登录
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </div>
-        </Teleport>
-
-        <el-dropdown
-          trigger="contextmenu"
-          ref="contextDropdown"
-          popper-class="tabs-context-menu"
-          :popper-options="popperOptions"
-        >
-          <!-- 占位节点，真正位置由 popper-options 提供 -->
-          <span class="context-trigger"></span>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item @click="closeOthers">关闭其他</el-dropdown-item>
-              <el-dropdown-item @click="closeRight">关闭右侧</el-dropdown-item>
-              <el-dropdown-item @click="closeAll">关闭所有</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
-      </nav>
-
+        </div>
+        <!-- 标签栏 -->
+        <nav class="tabs-container">
+          <el-scrollbar class="tabs-scrollbar" ref="tabsScrollbarRef">
+          </el-scrollbar>
+          <el-tabs
+            v-model="activeTab"
+            type="card"
+            closable
+            @tab-click="handleTabClick"
+            @tab-remove="handleTabClose"
+            @contextmenu.prevent="onTabsContextmenu"
+          >
+            <el-tab-pane
+              v-for="tab in visitedTabs"
+              :key="tab.name"
+              :name="tab.name"
+              @contextmenu.prevent="showContextMenu($event, tab.name)"
+            >
+              <template #label>
+                <span :class="{ 'active-dot': tab.name === activeTab }">
+                  {{ tab.title }}
+                </span>
+              </template>
+            </el-tab-pane>
+          </el-tabs>
+        </nav>
+      </header>
       <!-- 页面主体 -->
       <section class="content">
         <slot />
@@ -141,11 +138,25 @@ import {
   Monitor,
   User,
   Document,
-  Setting,
-  UserFilled,
   ArrowDown,
+  Lock,
+  SwitchButton,
+  Refresh,
+  Close,
+  CircleClose,
+  Minus,
+  Menu,
+  Setting,
+  HomeFilled,
+  UserFilled,
 } from "@element-plus/icons-vue";
 import { nextTick } from "vue";
+
+// 写死的用户信息
+const userInfo = ref({
+  name: "管理员",
+  avatar: "https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png",
+});
 
 interface Tab {
   name: string;
@@ -312,9 +323,11 @@ function onTabsContextmenu(e: MouseEvent) {
 
     .el-menu-item {
       color: $menuText;
+
       &:hover {
         background-color: $menuHover;
       }
+
       &.is-active {
         background-color: $menuActiveBg;
         color: $menuActiveText;
@@ -323,6 +336,7 @@ function onTabsContextmenu(e: MouseEvent) {
 
     .el-sub-menu__title {
       color: $menuText;
+
       &:hover {
         background-color: $menuHover;
       }
@@ -335,82 +349,91 @@ function onTabsContextmenu(e: MouseEvent) {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background-color: #f0f2f5;
 }
 
 .header {
-  height: $headerHeight;
+  background-color: red;
   background-color: #fff;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 20px;
-
-  .breadcrumb {
-    font-size: 14px;
-    color: #606266;
-  }
-
-  .user-info {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  .header-top {
     display: flex;
+    justify-content: space-between;
+    padding: 10px 20px;
     align-items: center;
-    gap: 10px;
+    border-bottom: 1px solid #e4e7ed;
+    .breadcrumb {
+      font-size: 14px;
+      color: #606266;
+    }
 
-    .el-dropdown-link {
-      cursor: pointer;
-      color: #409eff;
+    .user-info {
       display: flex;
       align-items: center;
-      gap: 5px;
-    }
-  }
-}
+      gap: 10px;
 
-.tabs-bar {
-  height: $tabsBarHeight;
-  background-color: #fff;
-  border-bottom: 1px solid #e6e6e6;
-  display: flex;
-  align-items: center;
-  padding: 0 10px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-
-  .el-tabs {
-    flex: 1;
-    :deep(.el-tabs__header) {
-      margin: 0;
-      border-bottom: none;
-    }
-    :deep(.el-tabs__nav) {
-      border: none;
-    }
-    :deep(.el-tabs__item) {
-      border: none;
-      height: 32px;
-      line-height: 32px;
-      padding: 0 12px;
-      font-size: 12px;
-      color: #666;
-      &.is-active {
-        background-color: $menuActiveBg;
-        color: #fff;
+      .el-dropdown-link {
+        cursor: pointer;
+        color: #409eff;
+        display: flex;
+        align-items: center;
+        gap: 5px;
       }
     }
   }
 
-  .active-dot::before {
-    content: "";
-    display: inline-block;
-    width: 6px;
-    height: 6px;
-    background-color: white;
-    border-radius: 50%;
-    margin-right: 6px;
-    vertical-align: middle;
-  }
+  .tabs-container {
+    height: $tabsBarHeight;
+    background-color: #fff;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 
-  .tabs-more {
-    margin-left: 10px;
+    .el-tabs {
+      flex: 1;
+
+      :deep(.el-tabs__header) {
+        margin: 0;
+        border-bottom: none;
+      }
+
+      :deep(.el-tabs__nav) {
+        border: none;
+      }
+
+      :deep(.el-tabs__item) {
+        // border: none;
+        border: 1px solid #e4e7ed;
+        height: 26px;
+        line-height: 32px;
+        padding: 0 6px;
+        margin: 0 3px;
+        font-size: 12px;
+        color: #666;
+        border-radius: 4px;
+
+        &.is-active {
+          background-color: $menuActiveBg;
+          color: #fff;
+        }
+      }
+    }
+
+    .active-dot::before {
+      content: "";
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      background-color: white;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+
+    .tabs-more {
+      margin-left: 10px;
+    }
   }
 }
 
@@ -428,6 +451,7 @@ function onTabsContextmenu(e: MouseEvent) {
   .context-item {
     padding: 6px 12px;
     cursor: pointer;
+
     &:hover {
       background-color: #f5f7fa;
     }
@@ -436,14 +460,20 @@ function onTabsContextmenu(e: MouseEvent) {
 
 .content {
   flex: 1;
-  padding: 20px;
+  margin: 10px;
   overflow-y: auto;
   background-color: $contentBg;
+
+  // padding: 0;
+  // background-color: #fff;
+  // border-radius: 4px;
+  // overflow: hidden;
 }
 
 @media (max-width: 768px) {
   .sidebar {
     width: 64px;
+
     .logo {
       font-size: 14px;
     }
