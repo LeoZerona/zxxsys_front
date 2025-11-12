@@ -247,6 +247,7 @@ function showContextMenu(e: MouseEvent, tabName: string) {
 }
 
 function onTabsContextmenu(e: MouseEvent) {
+  console.log("右键事件");
   /* 真正被右键的元素是 .el-tabs__item */
   const item = (e.target as HTMLElement).closest(".el-tabs__item");
   if (!item) return;
