@@ -88,7 +88,7 @@
           </div>
         </div>
         <!-- 标签栏 -->
-        <nav class="tabs-container">
+        <nav class="tabs-container" @contextmenu.prevent="onTabsContextmenu">
           <el-scrollbar class="tabs-scrollbar" ref="tabsScrollbarRef">
           </el-scrollbar>
           <el-tabs
@@ -97,13 +97,11 @@
             closable
             @tab-click="handleTabClick"
             @tab-remove="handleTabClose"
-            @contextmenu.prevent="onTabsContextmenu"
           >
             <el-tab-pane
               v-for="tab in visitedTabs"
               :key="tab.name"
               :name="tab.name"
-              @contextmenu.prevent="showContextMenu($event, tab.name)"
             >
               <template #label>
                 <span :class="{ 'active-dot': tab.name === activeTab }">
@@ -112,6 +110,28 @@
               </template>
             </el-tab-pane>
           </el-tabs>
+
+          <!-- 右键菜单：ElementPlus 实现 -->
+          <el-dropdown
+            trigger="contextmenu"
+            ref="contextDropdown"
+            popper-class="tabs-context-menu"
+            :popper-options="popperOptions"
+          >
+            <!-- 占位节点，真正位置由 popper-options 提供 -->
+            <span class="context-trigger"></span>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item @click="closeOthers"
+                  >关闭其他</el-dropdown-item
+                >
+                <el-dropdown-item @click="closeRight"
+                  >关闭右侧</el-dropdown-item
+                >
+                <el-dropdown-item @click="closeAll">关闭所有</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </nav>
       </header>
       <!-- 页面主体 -->
@@ -134,6 +154,7 @@ import {
   SwitchButton,
 } from "@element-plus/icons-vue";
 import { nextTick } from "vue";
+import { Placement } from "element-plus";
 
 // 写死的用户信息
 const userInfo = ref({
@@ -162,14 +183,93 @@ const menuTitleMap: Record<string, string> = {
   settings: "系统设置",
 };
 
-const contextMenuVisible = ref(false);
-const contextMenuX = ref(0);
-const contextMenuY = ref(0);
+const contextDropdown = ref(); // el-dropdown 实例
 let rightClickTab = ""; // 记录右键的是哪个 tab
+
+// 1. 修改 popperOptions，禁用会自动调整位置的修饰符
+const popperOptions = ref({
+  strategy: "fixed" as const,
+  placement: "bottom-start" as Placement,
+  modifiers: [
+    { name: "flip", enabled: false }, // 禁用翻转
+    { name: "offset", enabled: false }, // 禁用偏移计算
+    { name: "preventOverflow", enabled: false }, // 禁用溢出检测
+    { name: "computeStyles", enabled: false }, // 禁用自适应样式
+  ],
+});
+
+// 2. 修复后的右键事件处理
+function onTabsContextmenu(e: MouseEvent) {
+  const item = (e.target as HTMLElement).closest(".el-tabs__item");
+  if (!item) return;
+  const paneName = item.getAttribute("aria-controls")?.replace("pane-", "");
+  if (!paneName) return;
+
+  e.preventDefault();
+  rightClickTab = paneName;
+
+  // 存储当前鼠标位置
+  const x = e.clientX + 10;
+  const y = e.clientY + 10;
+
+  nextTick(() => {
+    const dd = contextDropdown.value;
+    if (!dd) return;
+
+    // 先打开下拉菜单
+    dd.handleOpen();
+
+    // 等待 Popper 完成定位后，强制覆盖位置
+    setTimeout(() => {
+      // 获取真正的 popper DOM 元素
+      const popperEl =
+        dd.popperRef?.popperContentRef ||
+        dd.popperRef?.popper ||
+        document.querySelector(".tabs-context-menu");
+
+      if (popperEl) {
+        // 禁用 transform 定位，改用 fixed + left/top
+        popperEl.style.transform = "none";
+        popperEl.style.position = "absolute";
+        popperEl.style.left = `${x}px`;
+        popperEl.style.top = `${y}px`;
+        popperEl.style.zIndex = "9999";
+        /* 搬箭头：先找到它，再给它一个固定偏移 */
+        const arrow = popperEl.querySelector(
+          ".el-popper__arrow"
+        ) as HTMLElement;
+        if (arrow) {
+          // arrow.style.transform = "none";
+          arrow.style.top = "-5px";
+        }
+      }
+    }, 10); // 微小延迟确保 Popper 已完成初始渲染
+  });
+}
 
 const currentPageTitle = computed(
   () => menuTitleMap[activeMenu.value] ?? "用户列表"
 );
+
+/* 三个关闭逻辑 */
+function closeOthers() {
+  visitedTabs.value = visitedTabs.value.filter((t) => t.name === rightClickTab);
+  activeTab.value = rightClickTab;
+  router.push({ name: rightClickTab });
+}
+
+function closeRight() {
+  const idx = visitedTabs.value.findIndex((t) => t.name === rightClickTab);
+  visitedTabs.value = visitedTabs.value.slice(0, idx + 1);
+  activeTab.value = rightClickTab;
+  router.push({ name: rightClickTab });
+}
+
+function closeAll() {
+  visitedTabs.value = [{ name: "dashboard", title: "仪表盘" }];
+  activeTab.value = "dashboard";
+  router.push({ name: "dashboard" });
+}
 
 /* 标签栏逻辑 */
 const addTab = (name: string) => {
@@ -201,10 +301,10 @@ const handleTabClick = (pane: any) => {
   // router.push({ name });
 };
 
-const handleTabClose = (name: string) => closeTab(name);
+const handleTabClose = (name: any) => closeTab(name);
 // 点击其他地方关闭右键菜单
 window.addEventListener("click", () => {
-  contextMenuVisible.value = false;
+  // contextMenuVisible.value = false;
 });
 
 const handleMenuSelect = (index: string) => {
@@ -228,34 +328,6 @@ watch(
   },
   { immediate: true }
 );
-
-/* 显示菜单 */
-function showContextMenu(e: MouseEvent, tabName: string) {
-  console.log("改标签触发右键事件");
-
-  e.preventDefault(); // 阻止原生右键菜单
-  rightClickTab = tabName;
-  contextMenuX.value = e.clientX;
-  contextMenuY.value = e.clientY;
-  contextMenuVisible.value = true;
-
-  /* 点别的地方自动关闭 */
-  nextTick(() => {
-    const close = () => (contextMenuVisible.value = false);
-    document.addEventListener("click", close, { once: true });
-  });
-}
-
-function onTabsContextmenu(e: MouseEvent) {
-  console.log("右键事件");
-  /* 真正被右键的元素是 .el-tabs__item */
-  const item = (e.target as HTMLElement).closest(".el-tabs__item");
-  if (!item) return;
-
-  /* 从属性里把 pane 的 name 读出来 */
-  const paneName = item.getAttribute("aria-controls")?.replace("pane-", "");
-  if (paneName) showContextMenu(e, paneName);
-}
 </script>
 
 <style scoped lang="scss">
