@@ -3,29 +3,26 @@
     ref="contextDropdown"
     trigger="click"
     :teleported="false"
-    popper-class="tabs-context-menu"
+    :popper-class="`tabs-context-menu ${popperClass}`"
     :popper-options="popperOptions"
   >
     <!-- 占位节点，真正位置由 popper-options 提供 -->
     <span class="context-trigger"></span>
     <template #dropdown>
       <el-dropdown-menu>
-        <!-- <el-dropdown-item>关闭其他</el-dropdown-item>
-        <el-dropdown-item>关闭右侧</el-dropdown-item>
-        <el-dropdown-item>关闭所有</el-dropdown-item> -->
-
         <template v-for="item in menuList" :key="item.key">
           <!-- 分割线 -->
-          <el-dropdown-item
+          <!-- <el-dropdown-item
             v-if="item.divided"
             :divided="true"
             style="height: 1px; padding: 0; margin: 4px 0"
-          />
+          /> -->
           <!-- 普通菜单项 -->
           <el-dropdown-item
             :disabled="item.disabled"
             :icon="item.icon"
             @click="handleClick(item)"
+            :divided="item.divided"
           >
             {{ item.label }}
           </el-dropdown-item>
@@ -132,10 +129,18 @@ function openContextMenu(e: MouseEvent) {
 function handleClick(item: MenuItem) {
   emit("click", item);
   /* 关闭下拉 */
+  /* 关闭下拉 */
+  contextDropdown.value.handleClose();
 }
 
 /* 把 open 方法暴露出去，父组件也可以通过 ref 调用 */
 defineExpose({ openContextMenu });
 </script>
 <style lang="scss" scoped>
+/*  popper 里所有 dropdown 菜单项 */
+:deep(.tabs-context-menu) {
+  .el-dropdown-menu__item {
+    justify-content: flex-end;
+  }
+}
 </style>
