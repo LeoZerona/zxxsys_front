@@ -109,7 +109,7 @@
               </template>
             </el-tab-pane>
           </el-tabs>
-          <ContextMenu ref="ctx"></ContextMenu>
+          <ContextMenu ref="ctx" :menu-list="menuList"></ContextMenu>
           <!-- 右键菜单：ElementPlus 实现 -->
           <el-dropdown
             trigger="contextmenu"
@@ -154,7 +154,7 @@ import {
 } from "@element-plus/icons-vue";
 import { nextTick } from "vue";
 import { Placement } from "element-plus";
-import ContextMenu from "@/components/menu/contextMenu.vue";
+import ContextMenu, { type MenuItem } from "@/components/contextMenu/index.vue";
 // 写死的用户信息
 const userInfo = ref({
   name: "管理员",
@@ -187,6 +187,13 @@ const menuTitleMap: Record<string, string> = {
   category: "分类管理",
   settings: "系统设置",
 };
+
+const menuList = ref<MenuItem[]>([
+  { key: "closeOther", label: "关闭其他", icon: "CircleClose" },
+  { key: "closeLeft", label: "关闭左侧" },
+  { divided: true },
+  { key: "closeAll", label: "关闭所有", disabled: false },
+]);
 
 const contextDropdown = ref(); // el-dropdown 实例
 let rightClickTab = ""; // 记录右键的是哪个 tab
