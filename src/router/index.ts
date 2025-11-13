@@ -19,7 +19,7 @@ const router = createRouter({
     {
       path: "/test",
       name: "test",
-      component: () => import("@/pages/second/asd.vue"),
+      component: () => import("@/pages/second/test.vue"),
     },
     // {
     //   path: "/:pathMatch(.*)*",

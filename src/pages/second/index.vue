@@ -1,4 +1,3 @@
-<!-- AdminLayout.vue (含标签栏) -->
 <template>
   <div class="admin-container">
     <!-- 顶部头部 -->
@@ -88,7 +87,7 @@
           </div>
         </div>
         <!-- 标签栏 -->
-        <nav class="tabs-container" @contextmenu.prevent="onTabsContextmenu">
+        <nav class="tabs-container" @contextmenu.prevent="openMenu">
           <el-scrollbar class="tabs-scrollbar" ref="tabsScrollbarRef">
           </el-scrollbar>
           <el-tabs
@@ -110,7 +109,7 @@
               </template>
             </el-tab-pane>
           </el-tabs>
-
+          <ContextMenu ref="ctx"></ContextMenu>
           <!-- 右键菜单：ElementPlus 实现 -->
           <el-dropdown
             trigger="contextmenu"
@@ -155,13 +154,19 @@ import {
 } from "@element-plus/icons-vue";
 import { nextTick } from "vue";
 import { Placement } from "element-plus";
-
+import ContextMenu from "@/components/menu/contextMenu.vue";
 // 写死的用户信息
 const userInfo = ref({
   name: "管理员",
   avatar: "https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png",
 });
+const ctx = ref<InstanceType<typeof ContextMenu>>();
+function openMenu(e: MouseEvent) {
+  console.log("触发事件", e);
 
+  /* 把事件传进去，让组件自己定位 */
+  ctx.value!.openContextMenu(e);
+}
 interface Tab {
   name: string;
   title: string;
@@ -471,27 +476,6 @@ watch(
 
     .tabs-more {
       margin-left: 10px;
-    }
-  }
-}
-
-.context-menu {
-  position: fixed;
-  z-index: 9999;
-  background: #fff;
-  border: 1px solid #e4e7ed;
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  padding: 4px 0;
-  font-size: 12px;
-  width: 110px;
-
-  .context-item {
-    padding: 6px 12px;
-    cursor: pointer;
-
-    &:hover {
-      background-color: #f5f7fa;
     }
   }
 }
