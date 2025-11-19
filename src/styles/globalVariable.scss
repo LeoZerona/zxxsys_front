@@ -18,11 +18,14 @@
     }
   }
 
-  /* 尺寸变量 */
+/* 新写法：用前缀避免污染 */
+$prefix: 'g';               // 可选，统一命名空间
+/* 尺寸变量 */
 $sideBarWidth: 240px;              // 左侧菜单宽度
 $headerHeight: 60px;               // 顶部导航栏高度
 $tabsBarHeight: 40px;              // 标签栏高度
 $contentBg: #f5f7fa;               // 主内容区背景色
+
 
 // #f0f2f5
 

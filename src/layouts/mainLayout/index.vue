@@ -12,9 +12,10 @@
           prefix-icon="search"
           class="search-input"
         />
-        <!-- <el-icon><Expand /></el-icon> -->
-        <!-- @click="isCollapse = !isCollapse -->
-        <el-icon class="icon"><Fold /></el-icon>
+        <el-icon class="icon" @click="isCollapse = !isCollapse">
+          <Fold v-show="isCollapse" />
+          <Expand v-show="!isCollapse" />
+        </el-icon>
       </div>
       <el-menu
         :default-active="activeMenu"
@@ -23,6 +24,7 @@
         text-color="#bfcbd9"
         active-text-color="#1890ff"
         @select="handleMenuSelect"
+        :collapse="isCollapse"
       >
         <el-menu-item index="dashboard">
           <el-icon>
@@ -146,10 +148,9 @@ const userInfo = ref({
   name: "管理员",
   avatar: "https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png",
 });
+const isCollapse = ref(false);
 const ctx = ref<InstanceType<typeof ContextMenu>>();
 function openMenu(e: MouseEvent) {
-  console.log("触发事件", e);
-
   /* 把事件传进去，让组件自己定位 */
   ctx.value!.openContextMenu(e);
 }
@@ -332,26 +333,26 @@ watch(
 );
 </script>
     
-    <style scoped lang="scss">
-@import "@/styles/globalVariable.scss";
-
+<style scoped lang="scss">
+// @import "@/styles/globalVariable.scss";
+@use "@/styles/globalVariable.scss" as g;
 .admin-container {
   display: flex;
   height: 100vh;
 }
 
 .sidebar {
-  width: $sideBarWidth;
-  background-color: $menuBg;
+  width: g.$sideBarWidth;
+  background-color: g.$menuBg;
   box-shadow: 2px 0 6px rgba(0, 0, 0, 0.1);
   transition: width 0.3s ease;
 
   .logo {
-    height: $headerHeight;
+    height: g.$headerHeight;
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: $menuDarkBg;
+    background-color: g.$menuDarkBg;
     color: #fff;
     font-size: 20px;
     font-weight: bold;
@@ -374,23 +375,23 @@ watch(
     border-right: none;
 
     .el-menu-item {
-      color: $menuText;
+      color: g.$menuText;
 
       &:hover {
-        background-color: $menuHover;
+        background-color: g.$menuHover;
       }
 
       &.is-active {
-        background-color: $menuActiveBg;
-        color: $menuActiveText;
+        background-color: g.$menuActiveBg;
+        color: g.$menuActiveText;
       }
     }
 
     .el-sub-menu__title {
-      color: $menuText;
+      color: g.$menuText;
 
       &:hover {
-        background-color: $menuHover;
+        background-color: g.$menuHover;
       }
     }
   }
@@ -435,7 +436,7 @@ watch(
   }
 
   .tabs-container {
-    height: $tabsBarHeight;
+    height: g.$tabsBarHeight;
     background-color: #fff;
     display: flex;
     align-items: center;
@@ -466,7 +467,7 @@ watch(
         border-radius: 4px;
 
         &.is-active {
-          background-color: $menuActiveBg;
+          background-color: g.$menuActiveBg;
           color: #fff;
         }
       }
@@ -493,7 +494,7 @@ watch(
   flex: 1;
   margin: 10px;
   overflow-y: auto;
-  background-color: $contentBg;
+  background-color: g.$contentBg;
 }
 
 @media (max-width: 768px) {
