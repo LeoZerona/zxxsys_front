@@ -8,6 +8,7 @@ const router = createRouter({
   routes: [
     {
       path: "/",
+      alias: ['/login'],
       name: "login",
       component: () => import("@/pages/login/index.vue"),
     },

@@ -2,8 +2,8 @@
   <div class="login-page">
     <div class="login-container">
       <header class="login-header">
-        <h1>{{ isRegister ? '创建账户' : '欢迎回来' }}</h1>
-        <p>{{ isRegister ? '注册后即可登录后台' : '请登录您的管理员账户' }}</p>
+        <h1>{{ isRegister ? "创建账户" : "欢迎回来" }}</h1>
+        <p>{{ isRegister ? "注册后即可登录后台" : "请登录您的管理员账户" }}</p>
       </header>
 
       <!-- 表单 -->
@@ -65,14 +65,16 @@
           class="login-button"
           :loading="loading"
         >
-          {{ isRegister ? '立即注册' : '登录' }}
+          {{ isRegister ? "立即注册" : "登录" }}
         </el-button>
 
         <!-- 底部切换 -->
         <div class="bottom-switch">
-          <span class="hint">{{ isRegister ? '已有账户？' : '还没有账户？' }}</span>
-          <el-link type="primary" :underline="false" @click="isRegister = !isRegister">
-            {{ isRegister ? '去登录' : '去注册' }}
+          <span class="hint">{{
+            isRegister ? "已有账户？" : "还没有账户？"
+          }}</span>
+          <el-link type="primary" :underline="false" @click="switchOperation">
+            {{ isRegister ? "去登录" : "去注册" }}
           </el-link>
         </div>
       </el-form>
@@ -101,71 +103,94 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
-import type { FormInstance, FormRules } from 'element-plus'
-import { User, Lock } from '@element-plus/icons-vue'
+import { reactive, ref } from "vue";
+import { ElMessage, type FormInstance, type FormRules } from "element-plus";
+import { User, Lock } from "@element-plus/icons-vue";
 
 /* -------------- 状态 -------------- */
-const isRegister = ref(false)
-const showForgetModal = ref(false)
-const resetEmail = ref('')
-const loading = ref(false)
-const ruleFormRef = ref<FormInstance>()
+const isRegister = ref(false);
+const showForgetModal = ref(false);
+const resetEmail = ref("");
+const loading = ref(false);
+const ruleFormRef = ref<FormInstance>();
 
 const form = reactive({
-  username: '',
-  password: '',
+  username: "",
+  password: "",
   remember: false,
-  confirmPwd: ''
-})
+  confirmPwd: "",
+});
 
 /* -------------- 校验规则 -------------- */
 const rules = reactive<FormRules>({
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
+  username: [{ required: true, message: "请输入用户名", trigger: "blur" }],
+  password: [{ required: true, message: "请输入密码", trigger: "blur" }],
   confirmPwd: [
     {
       validator: (_rule, value, callback) => {
-        if (!isRegister.value) return callback()
-        if (!value) return callback(new Error('请再次输入密码'))
-        if (value !== form.password) return callback(new Error('两次密码不一致'))
-        callback()
+        if (!isRegister.value) return callback();
+        if (!value) return callback(new Error("请再次输入密码"));
+        if (value !== form.password)
+          return callback(new Error("两次密码不一致"));
+        callback();
       },
-      trigger: 'blur'
-    }
-  ]
-})
+      trigger: "blur",
+    },
+  ],
+});
 
 /* -------------- 提交 -------------- */
 const handleSubmit = async () => {
-  await ruleFormRef.value?.validate(valid => {
-    if (!valid) return
-    loading.value = true
+  await ruleFormRef.value?.validate((valid) => {
+    if (!valid) {
+      ElMessage.error("请检查账号和密码是否输入");
+      return;
+    }
+    loading.value = true;
     setTimeout(() => {
       if (isRegister.value) {
-        alert('注册成功，请登录')
-        isRegister.value = false
+        alert("注册成功，请登录");
+        isRegister.value = false;
       } else {
-        console.log('[Login]', form)
+        console.log("[Login]", form);
       }
-      loading.value = false
-    }, 600)
-  })
-}
+      loading.value = false;
+    }, 600);
+  });
+};
 
 /* -------------- 忘记密码 -------------- */
-const onForget = () => (showForgetModal.value = true)
+const onForget = () => (
+  // 弹出忘记密码弹窗前应该先清空
+  (resetEmail.value = ""),
+  ruleFormRef.value?.resetFields(),
+  (showForgetModal.value = true)
+);
 const sendResetEmail = () => {
-  if (!resetEmail.value) return
-  console.log('[Reset Email]', resetEmail.value)
-  alert('重置链接已发送，请查收邮箱')
-  showForgetModal.value = false
-}
+  // 判断邮箱格式
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  // 如果邮箱格式不正确进行提醒
+  if (!emailRegex.test(resetEmail.value)) {
+    // 修改为element-plus的提示方式
+    ElMessage.error("请输入正确的邮箱格式");
+    return;
+  }
+  console.log("[Reset Email]", resetEmail.value);
+  // alert("");
+  ElMessage.success("重置链接已发送，请查收邮箱");
+  showForgetModal.value = false;
+};
+
+/* -------------- 切换操作 -------------- */
+const switchOperation = () => {
+  isRegister.value = !isRegister.value;
+  ruleFormRef.value?.resetFields();
+};
 </script>
 
 <style lang="scss" scoped>
 /* 原样式完全保留，仅把 .text-btn 里的 darken 换成 color.adjust */
-@use 'sass:color';
+@use "sass:color";
 
 $primary: #3498db;
 $dark: #2c3e50;
@@ -220,11 +245,11 @@ $radius: 8px;
 
 /* 底部切换 */
 .bottom-switch {
-  display: flex; 
-  align-items: center; 
+  display: flex;
+  align-items: center;
   justify-content: center;
   margin-top: 20px;
-  gap: 4px;            
+  gap: 4px;
   font-size: 14px;
   color: $gray;
 }

@@ -281,9 +281,12 @@ const addTab = (name: string) => {
   if (!title) return;
   const exists = visitedTabs.value.some((tab) => tab.name === name);
   if (!exists) {
-    visitedTabs.value.push({ name, title });
+    visitedTabs.value.unshift({ name, title });
   }
-  activeTab.value = name;
+  activeTab.value = "";
+  setTimeout(() => {
+    activeTab.value = name;
+  }, 10);
 };
 
 const closeTab = (name: string) => {
@@ -314,7 +317,7 @@ window.addEventListener("click", () => {
 const handleMenuSelect = (index: string) => {
   activeMenu.value = index;
   addTab(index);
-  console.log("菜单跳转");
+  console.log("菜单跳转", index);
   router.push({ name: "test" });
   // router.push({ name: index });
 };
