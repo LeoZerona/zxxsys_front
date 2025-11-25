@@ -31,8 +31,12 @@
     </template>
   </el-dropdown>
 </template>
-<script lang="ts" setup>
+<script setup lang="ts">
 import { nextTick, ref } from "vue";
+
+defineOptions({
+  name: "ContextMenu",
+});
 import type { Placement } from "element-plus";
 
 export interface MenuItem {
@@ -136,6 +140,7 @@ function handleClick(item: MenuItem) {
 /* 把 open 方法暴露出去，父组件也可以通过 ref 调用 */
 defineExpose({ openContextMenu });
 </script>
+
 <style lang="scss" scoped>
 /*  popper 里所有 dropdown 菜单项 */
 :deep(.tabs-context-menu) {

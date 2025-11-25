@@ -1,5 +1,7 @@
 <template>
-  <mainLayout></mainLayout>
+  <mainLayout>
+    <router-view />
+  </mainLayout>
 </template>
 <script setup lang="ts">
 import mainLayout from "@/layouts/mainLayout/index.vue";

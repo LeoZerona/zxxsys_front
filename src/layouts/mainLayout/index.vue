@@ -2,19 +2,19 @@
   <div class="admin-container">
     <!-- 顶部头部 -->
     <!-- 侧边栏 -->
-    <aside class="sidebar">
-      <div class="logo">后台管理系统</div>
+    <aside class="sidebar" :class="{ collapse: isCollapse }">
+      <!-- <div class="logo">后台管理系统</div> -->
       <div class="tool">
-        <el-input
+        <!-- <el-input
           v-model="input"
           placeholder="输入检索菜单"
           size="small"
           prefix-icon="search"
           class="search-input"
-        />
+        /> -->
         <el-icon class="icon" @click="isCollapse = !isCollapse">
-          <Fold v-show="isCollapse" />
-          <Expand v-show="!isCollapse" />
+          <Expand v-show="isCollapse" />
+          <Fold v-show="!isCollapse" />
         </el-icon>
       </div>
       <el-menu
@@ -137,12 +137,13 @@
   </div>
 </template>
     
-  <script setup lang="ts">
+<script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { nextTick } from "vue";
 import { Placement } from "element-plus";
 import ContextMenu, { type MenuItem } from "@/components/contextMenu/index.vue";
+
 // 写死的用户信息
 const userInfo = ref({
   name: "管理员",
@@ -313,6 +314,8 @@ window.addEventListener("click", () => {
 const handleMenuSelect = (index: string) => {
   activeMenu.value = index;
   addTab(index);
+  console.log("菜单跳转");
+  router.push({ name: "test" });
   // router.push({ name: index });
 };
 
@@ -342,10 +345,13 @@ watch(
 }
 
 .sidebar {
-  width: g.$sideBarWidth;
+  // width: g.$sideBarWidth;
   background-color: g.$menuBg;
   box-shadow: 2px 0 6px rgba(0, 0, 0, 0.1);
-  transition: width 0.3s ease;
+  // transition: width 0.8s ease;
+  // &.collapse {
+  //   width: 64px;
+  // }
 
   .logo {
     height: g.$headerHeight;

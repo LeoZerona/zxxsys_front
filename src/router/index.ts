@@ -20,17 +20,19 @@ const router = createRouter({
       path: "/second",
       name: "second",
       component: () => import("@/pages/second/index.vue"),
+      children: [
+        {
+          path: "/test",
+          name: "test",
+          component: () => import("@/pages/test/index.vue"),
+        },
+      ]
     },
-    // {
-    //   path: "/test",
-    //   name: "test",
-    //   component: () => import("@/pages/second/test.vue"),
-    // },
-    // {
-    //   path: "/:pathMatch(.*)*",
-    //   name: "not-found",
-    //   component: () => import("@/pages/second.vue"),
-    // },
+    {
+      path: "/:pathMatch(.*)*",
+      name: "not-found",
+      component: () => import("@/pages/404/index.vue"),
+    },
   ],
 });
 
