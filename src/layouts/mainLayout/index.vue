@@ -97,7 +97,7 @@ interface Tab {
 }
 const visitedTabs = ref<Tab[]>([
   { name: "user-list", title: "用户列表" },
-  { name: "user-list", title: "用户列表" },
+  { name: "user-list1", title: "用户列表" },
 ]);
 const activeTab = ref<string>("user-list");
 

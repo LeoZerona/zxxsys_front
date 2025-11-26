@@ -97,6 +97,7 @@ function onTabRemove(name: TabPaneName) {
       &.is-active {
         background-color: g.$menuActiveBg;
         color: #fff;
+        padding: 0 12px;
       }
     }
   }
