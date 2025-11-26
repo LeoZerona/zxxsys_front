@@ -202,11 +202,12 @@ handleSearch();
       padding: 0;
     }
     .expand-input {
-      width: 148px;
+      width: 144px;
       opacity: 1;
     }
     .icon {
       margin-left: 10px;
+      font-size: 24px;
       cursor: pointer;
     }
   }

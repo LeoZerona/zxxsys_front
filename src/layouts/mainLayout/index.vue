@@ -2,7 +2,6 @@
   <div class="admin-container">
     <!-- 侧边栏 -->
     <aside class="sidebar" :class="{ collapse: isCollapse }">
-      <!-- 右侧菜单 -->
       <rightMenu
         :collapse="isCollapse"
         :active-menu="activeMenu"
@@ -28,7 +27,6 @@
                 管理员
                 <el-icon class="el-icon--right"><ArrowDown /></el-icon>
               </span>
-
               <template #dropdown>
                 <el-dropdown-menu>
                   <el-dropdown-item command="profile">
@@ -46,31 +44,15 @@
           </div>
         </div>
 
-        <!-- 标签栏 -->
-        <nav class="tabs-container" @contextmenu.prevent="openMenu">
-          <el-scrollbar ref="tabsScrollbarRef" />
-          <el-tabs
-            v-model="activeTab"
-            type="card"
-            closable
-            @tab-click="handleTabClick"
-            @tab-remove="handleTabClose"
-          >
-            <el-tab-pane
-              v-for="tab in visitedTabs"
-              :key="tab.name"
-              :name="tab.name"
-            >
-              <template #label>
-                <span :class="{ 'active-dot': tab.name === activeTab }">
-                  {{ tab.title }}
-                </span>
-              </template>
-            </el-tab-pane>
-          </el-tabs>
-
-          <ContextMenu ref="ctx" :menu-list="menuList" @click="onMenuClick" />
-        </nav>
+        <!-- 标签栏（已抽离） -->
+        <TabsBar
+          :visited-tabs="visitedTabs"
+          :active-tab="activeTab"
+          :menu-list="menuList"
+          @tab-click="handleTabClick"
+          @tab-remove="handleTabClose"
+          @context-menu-click="onMenuClick"
+        />
       </header>
 
       <!-- 页面主体 -->
@@ -84,10 +66,17 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import ContextMenu, {
-  type ContextMenuType,
-} from "@/components/contextMenu/index.vue";
 import rightMenu, { type MenuItem } from "./components/rightMenu.vue";
+import TabsBar from "./components/TabsBar.vue";
+import type { ContextMenuType } from "@/components/contextMenu/index.vue";
+
+/* ---------------- 数据 ---------------- */
+const userInfo = ref({
+  name: "管理员",
+  avatar: "https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png",
+});
+const isCollapse = ref(false);
+const activeMenu = ref<string>("user-list");
 
 const customMenu: MenuItem[] = [
   {
@@ -95,29 +84,21 @@ const customMenu: MenuItem[] = [
     title: "题库管理",
     icon: "Document",
     children: [
-      {
-        index: "originalQuestionBank",
-        title: "原题库",
-        icon: "",
-      },
-      {
-        index: "CleaningWarehouse",
-        title: "清洗库",
-        icon: "",
-      },
+      { index: "originalQuestionBank", title: "原题库", icon: "" },
+      { index: "CleaningWarehouse", title: "清洗库", icon: "" },
     ],
   },
   { index: "about", title: "试卷", icon: "InfoFilled", children: [] },
 ];
-/* --------------  数据  -------------- */
-const userInfo = ref({
-  name: "管理员",
-  avatar: "https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png",
-});
-const isCollapse = ref(false);
 
-const activeMenu = ref<string>("user-list");
-const visitedTabs = ref<Tab[]>([{ name: "user-list", title: "用户列表" }]);
+interface Tab {
+  name: string;
+  title: string;
+}
+const visitedTabs = ref<Tab[]>([
+  { name: "user-list", title: "用户列表" },
+  { name: "user-list", title: "用户列表" },
+]);
 const activeTab = ref<string>("user-list");
 
 const menuTitleMap: Record<string, string> = {
@@ -135,24 +116,14 @@ const menuList = ref<ContextMenuType[]>([
   { key: "closeAll", label: "关闭所有", disabled: false, divided: true },
 ]);
 
-const ctx = ref<InstanceType<typeof ContextMenu>>();
-
-/* --------------  计算属性  -------------- */
+/* ---------------- 计算属性 ---------------- */
 const currentPageTitle = computed(
   () => menuTitleMap[activeMenu.value] ?? "用户列表"
 );
 
-/* --------------  方法  -------------- */
+/* ---------------- 方法 ---------------- */
 const router = useRouter();
 const route = useRoute();
-
-function openMenu(e: MouseEvent) {
-  ctx.value!.openContextMenu(e);
-}
-
-function onMenuClick(item: MenuItem) {
-  console.log("点了：", item.key);
-}
 
 function handleMenuSelect(index: string) {
   activeMenu.value = index;
@@ -160,11 +131,7 @@ function handleMenuSelect(index: string) {
   router.push({ name: index });
 }
 
-/* 标签页相关方法（未改动） */
-interface Tab {
-  name: string;
-  title: string;
-}
+/* 标签页相关方法 */
 const addTab = (name: string) => {
   /* 略 */
 };
@@ -175,8 +142,11 @@ const handleTabClick = (pane: any) => {
   /* 略 */
 };
 const handleTabClose = (name: any) => closeTab(name);
+const onMenuClick = (key: string) => {
+  console.log("点了：", key);
+};
 
-/* 监听路由变化自动加签（未改动） */
+/* 路由监听 */
 watch(
   () => route.name as string,
   (name) => {
@@ -196,21 +166,10 @@ watch(
   display: flex;
   height: 100vh;
 }
-
 .sidebar {
   background-color: g.$menuBg;
   box-shadow: 2px 0 6px rgba(0, 0, 0, 0.1);
-  .tool {
-    display: flex;
-    justify-content: space-between;
-    padding: 0 2px;
-    .icon {
-      font-size: 2em;
-      cursor: pointer;
-    }
-  }
 }
-
 .main-content {
   flex: 1;
   display: flex;
@@ -218,7 +177,6 @@ watch(
   overflow: hidden;
   background-color: #f0f2f5;
 }
-
 .header {
   background-color: #fff;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
@@ -245,57 +203,13 @@ watch(
       }
     }
   }
-  .tabs-container {
-    height: g.$tabsBarHeight;
-    background-color: #fff;
-    display: flex;
-    align-items: center;
-    padding: 0 10px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-    .el-tabs {
-      flex: 1;
-      :deep(.el-tabs__header) {
-        margin: 0;
-        border-bottom: none;
-      }
-      :deep(.el-tabs__nav) {
-        border: none;
-      }
-      :deep(.el-tabs__item) {
-        border: 1px solid #e4e7ed;
-        height: 26px;
-        line-height: 32px;
-        padding: 0 6px;
-        margin: 0 3px;
-        font-size: 12px;
-        color: #666;
-        border-radius: 4px;
-        &.is-active {
-          background-color: g.$menuActiveBg;
-          color: #fff;
-        }
-      }
-    }
-    .active-dot::before {
-      content: "";
-      display: inline-block;
-      width: 6px;
-      height: 6px;
-      background-color: white;
-      border-radius: 50%;
-      margin-right: 6px;
-      vertical-align: middle;
-    }
-  }
 }
-
 .content {
   flex: 1;
   margin: 10px;
   overflow-y: auto;
   background-color: g.$contentBg;
 }
-
 @media (max-width: 768px) {
   .sidebar {
     width: 64px;
