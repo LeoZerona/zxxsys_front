@@ -72,10 +72,10 @@ const defaultMenu: MenuItem[] = [
   },
   {
     index: "user",
-    title: "用户管理",
+    title: "用户管理123123123123123123",
     icon: User,
     children: [
-      { index: "user-list", title: "用户列表111122222222222222222222222221" },
+      { index: "user-list", title: "用户列表11111231231231231" },
       { index: "user-role", title: "角色管理" },
     ],
   },
@@ -123,20 +123,29 @@ const isCollapse = ref(false);
 .el-menu-vertical {
   border-right: none;
 
+  .el-sub-menu__title {
+    span {
+      width: 6vw;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+  }
+
   .el-menu-item {
     width: 10vw;
-    background-color: red;
     color: g.$menuText;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    span {
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
     &:hover {
       background-color: g.$menuHover;
     }
     &.is-active {
       background-color: g.$menuActiveBg;
       color: g.$menuActiveText;
-      color: rebeccapurple;
     }
   }
 
