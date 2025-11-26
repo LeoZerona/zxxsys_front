@@ -39,7 +39,7 @@ defineOptions({
 });
 import type { Placement } from "element-plus";
 
-export interface MenuItem {
+export interface ContextMenuType {
   key?: string | number;
   label?: string;
   disabled?: boolean;
@@ -49,7 +49,7 @@ export interface MenuItem {
 }
 
 interface Props {
-  menuList: MenuItem[];
+  menuList: ContextMenuType[];
   popperClass?: string; // 如果父组件想再加一个自定义 class
 }
 const props = withDefaults(defineProps<Props>(), {
@@ -57,7 +57,7 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  click: [item: MenuItem]; // 把被选中的项抛给父组件
+  click: [item: ContextMenuType]; // 把被选中的项抛给父组件
 }>();
 
 const contextDropdown = ref(); // el-dropdown 实例
@@ -130,7 +130,7 @@ function openContextMenu(e: MouseEvent) {
 }
 
 /* 点击菜单项 */
-function handleClick(item: MenuItem) {
+function handleClick(item: ContextMenuType) {
   emit("click", item);
   /* 关闭下拉 */
   /* 关闭下拉 */
