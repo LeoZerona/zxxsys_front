@@ -1,14 +1,14 @@
 <template>
   <div class="tool">
-    <div class="search-wrapper" :class="{ isCollapse }">
-      <el-input
-        v-model="menuKey"
-        class="responsive-input"
-        placeholder="Type something"
-        :prefix-icon="Search"
-        v-show="!isCollapse"
-      />
-    </div>
+    <!-- v-show="!isCollapse" -->
+    <el-input
+      v-model="menuKey"
+      class="responsive-input"
+      placeholder="输入菜单检索"
+      :prefix-icon="Search"
+      :class="isCollapse ? 'shrink-input' : 'expand-input'"
+      @keyup.enter="handleSearch"
+    />
     <el-icon class="icon" @click="isCollapse = !isCollapse">
       <Expand v-show="isCollapse" />
       <Fold v-show="!isCollapse" />
@@ -25,7 +25,8 @@
     @select="handleSelect"
   >
     <!-- 递归渲染菜单 -->
-    <template v-for="item in menuData" :key="item.index">
+    <template v-for="item in filteredMenu" :key="item.index">
+      <!-- 改成 filteredMenu -->
       <!-- 叶子节点 -->
       <el-menu-item v-if="!item.children" :index="item.index">
         <el-icon v-if="item.icon">
@@ -109,9 +110,8 @@ const defaultMenu: MenuItem[] = [
     icon: Setting,
   },
 ];
-
-// collapse: { type: Boolean, default: false },
-
+/* ---------- 过滤后的菜单 ---------- */
+const filteredMenu = ref<MenuItem[]>([]);
 const props = defineProps({
   activeMenu: { type: String, default: "" },
   menuData: { type: Array as PropType<MenuItem[]>, default: () => [] },
@@ -132,6 +132,34 @@ const menuKey = ref("");
 const handleSelect = (index: string) => {
   emit("select", index);
 };
+
+/* ---------- 新增：递归过滤函数 ---------- */
+function filterMenu(list: MenuItem[], key: string): MenuItem[] {
+  if (!key.trim()) return list; // 空关键字返回原菜单
+  const res: MenuItem[] = [];
+  list.forEach((item) => {
+    const match = item.title.toLowerCase().includes(key.toLowerCase());
+    if (item.children) {
+      const children = filterMenu(item.children, key);
+      if (children.length) {
+        res.push({ ...item, children }); // 子节点命中，父节点保留
+      }
+    } else if (match) {
+      res.push(item); // 叶子节点命中
+    }
+  });
+  return res;
+}
+
+/* ---------- 新增：回车触发 ---------- */
+function handleSearch() {
+  const key = menuKey.value;
+  const source = props.menuData.length ? props.menuData : defaultMenu;
+  filteredMenu.value = filterMenu(source, key);
+}
+
+/* ---------- 生命周期：首次默认展示全部 ---------- */
+handleSearch(); // 组件挂载后先渲染完整菜单
 </script>
 
 <style scoped lang="scss">
@@ -146,28 +174,20 @@ const handleSelect = (index: string) => {
   background-color: #304156;
   color: #bfcbd9;
 
-  .search-wrapper {
-    overflow: hidden;
-    padding: 8px 12px;
-    transition: padding 0.3s ease;
-
-    .responsive-input {
-      width: 148px;
-      max-width: 100%; // 展开时宽度
-      opacity: 1;
-      transform: scaleX(1);
-      transform-origin: left center;
-      transition: max-width 0.3s ease, opacity 0.2s ease 0.05s,
-        transform 0.3s ease;
-    }
-
-    /* 收起状态 */
-    &.isCollapse .responsive-input {
-      max-width: 0; // 关键：宽度压到 0
-      opacity: 0;
-      transform: scaleX(0);
-      padding: 0 !important; // 去掉内边距，防止占位
-    }
+  .responsive-input {
+    transform: scaleX(1);
+    transform-origin: left center;
+    transition: max-width 0.3s ease, opacity 0.2s ease 0.05s,
+      transform 0.3s ease;
+  }
+  .shrink-input {
+    max-width: 0;
+    opacity: 0;
+    padding: 0;
+  }
+  .expand-input {
+    width: 148px;
+    opacity: 1;
   }
   .icon {
     margin-left: 10px;
