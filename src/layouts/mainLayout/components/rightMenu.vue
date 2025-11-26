@@ -1,5 +1,14 @@
 <template>
   <div class="tool">
+    <div class="search-wrapper" :class="{ isCollapse }">
+      <el-input
+        v-model="menuKey"
+        class="responsive-input"
+        placeholder="Type something"
+        :prefix-icon="Search"
+        v-show="!isCollapse"
+      />
+    </div>
     <el-icon class="icon" @click="isCollapse = !isCollapse">
       <Expand v-show="isCollapse" />
       <Fold v-show="!isCollapse" />
@@ -12,7 +21,7 @@
     background-color="#304156"
     text-color="#bfcbd9"
     active-text-color="#1890ff"
-    :collapse="collapse"
+    :collapse="isCollapse"
     @select="handleSelect"
   >
     <!-- 递归渲染菜单 -->
@@ -54,7 +63,13 @@ import { ref, computed } from "vue";
 import type { Component } from "vue"; // ✅ 仅类型导入，符合 verbatimModuleSyntax
 import type { PropType } from "vue";
 /* 引入你项目中用到的图标组件 */
-import { Monitor, User, Document, Setting } from "@element-plus/icons-vue";
+import {
+  Monitor,
+  User,
+  Document,
+  Setting,
+  Search,
+} from "@element-plus/icons-vue";
 
 export interface MenuItem {
   index: string;
@@ -72,10 +87,10 @@ const defaultMenu: MenuItem[] = [
   },
   {
     index: "user",
-    title: "用户管理123123123123123123",
+    title: "用户管理 123123123123123123",
     icon: User,
     children: [
-      { index: "user-list", title: "用户列表11111231231231231" },
+      { index: "user-list", title: "用户列表 11111231231231231" },
       { index: "user-role", title: "角色管理" },
     ],
   },
@@ -95,8 +110,9 @@ const defaultMenu: MenuItem[] = [
   },
 ];
 
+// collapse: { type: Boolean, default: false },
+
 const props = defineProps({
-  collapse: { type: Boolean, default: false },
   activeMenu: { type: String, default: "" },
   menuData: { type: Array as PropType<MenuItem[]>, default: () => [] },
 });
@@ -110,15 +126,54 @@ const emit = defineEmits<{
   select: [index: string];
 }>();
 
+const isCollapse = ref(false);
+const menuKey = ref("");
+
 const handleSelect = (index: string) => {
   emit("select", index);
 };
-
-const isCollapse = ref(false);
 </script>
 
 <style scoped lang="scss">
 @use "@/styles/globalVariable.scss" as g;
+.tool {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 20px;
+  padding-left: 13px;
+  height: 50px;
+  background-color: #304156;
+  color: #bfcbd9;
+
+  .search-wrapper {
+    overflow: hidden;
+    padding: 8px 12px;
+    transition: padding 0.3s ease;
+
+    .responsive-input {
+      width: 148px;
+      max-width: 100%; // 展开时宽度
+      opacity: 1;
+      transform: scaleX(1);
+      transform-origin: left center;
+      transition: max-width 0.3s ease, opacity 0.2s ease 0.05s,
+        transform 0.3s ease;
+    }
+
+    /* 收起状态 */
+    &.isCollapse .responsive-input {
+      max-width: 0; // 关键：宽度压到 0
+      opacity: 0;
+      transform: scaleX(0);
+      padding: 0 !important; // 去掉内边距，防止占位
+    }
+  }
+  .icon {
+    margin-left: 10px;
+    cursor: pointer;
+  }
+}
 
 .el-menu-vertical {
   border-right: none;

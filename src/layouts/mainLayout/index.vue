@@ -89,10 +89,26 @@ import ContextMenu, {
 } from "@/components/contextMenu/index.vue";
 import rightMenu, { type MenuItem } from "./components/rightMenu.vue";
 
-// const customMenu: MenuItem[] = [
-//   { index: "home", title: "首页", icon: "House" },
-//   { index: "about", title: "关于", icon: "InfoFilled" },
-// ];
+const customMenu: MenuItem[] = [
+  {
+    index: "home",
+    title: "题库管理",
+    icon: "Document",
+    children: [
+      {
+        index: "originalQuestionBank",
+        title: "原题库",
+        icon: "",
+      },
+      {
+        index: "CleaningWarehouse",
+        title: "清洗库",
+        icon: "",
+      },
+    ],
+  },
+  { index: "about", title: "试卷", icon: "InfoFilled", children: [] },
+];
 /* --------------  数据  -------------- */
 const userInfo = ref({
   name: "管理员",
