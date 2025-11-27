@@ -86,6 +86,12 @@ const customMenu: MenuItem[] = [
     children: [
       { index: "originalQuestionBank", title: "原题库", icon: "" },
       { index: "CleaningWarehouse", title: "清洗库", icon: "" },
+      {
+        index: "dsdsd",
+        title: "试卷22",
+        icon: "InfoFilled",
+        children: [{ index: "dsd", title: "清洗库11", icon: "" }],
+      },
     ],
   },
   { index: "about", title: "试卷", icon: "InfoFilled", children: [] },

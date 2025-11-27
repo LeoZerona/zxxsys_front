@@ -225,7 +225,7 @@ handleSearch();
     }
 
     .el-menu-item {
-      width: 10vw;
+      width: 100%;
       color: g.$menuText;
       span {
         overflow: hidden;
