@@ -82,29 +82,15 @@ const activeMenu = ref<string>("user-list");
 
 const customMenu: MenuItem[] = [
   {
-    index: "home",
+    name: "home",
     title: "题库管理",
     icon: "Document",
     children: [
-      { index: "originalQuestionBank", title: "原题库", icon: "" },
-      { index: "CleaningWarehouse", title: "清洗库", icon: "" },
-      {
-        index: "dsdsd",
-        title: "试卷22",
-        icon: "InfoFilled",
-        children: [
-          { index: "dsd", title: "清洗库11", icon: "" },
-          {
-            index: "sdaasdasd",
-            title: "试卷",
-            icon: "InfoFilled",
-            children: [{ index: "wcsdfsd", title: "清洗库11", icon: "" }],
-          },
-        ],
-      },
+      { name: "originalQuestionBank", title: "原题库", icon: "" },
+      { name: "CleaningWarehouse", title: "清洗库", icon: "" },
     ],
   },
-  { index: "about", title: "试卷", icon: "InfoFilled", children: [] },
+  { name: "about", title: "试卷", icon: "InfoFilled", children: [] },
 ];
 
 interface Tab {
@@ -141,10 +127,10 @@ const currentPageTitle = computed(
 const router = useRouter();
 const route = useRoute();
 
-function handleMenuSelect(index: string) {
-  activeMenu.value = index;
-  addTab(index);
-  router.push({ name: index });
+function handleMenuSelect(name: string) {
+  activeMenu.value = name;
+  addTab(name);
+  // router.push({ name: index });
 }
 
 /* 标签页相关方法 */

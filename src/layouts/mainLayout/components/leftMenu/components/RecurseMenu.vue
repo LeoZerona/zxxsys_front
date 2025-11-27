@@ -1,9 +1,9 @@
 <!-- RecurseMenu.vue -->
 <template>
-  <template v-for="item in menuList" :key="item.index">
+  <template v-for="item in menuList" :key="item.name">
     <el-menu-item
       v-if="!item.children || item.children.length === 0"
-      :index="item.index"
+      :index="item.name"
     >
       <el-icon v-if="item.icon">
         <component :is="item.icon" />
@@ -11,7 +11,7 @@
       <span v-html="highlight(item.title, keyword)"></span>
     </el-menu-item>
 
-    <el-sub-menu v-else :index="item.index">
+    <el-sub-menu v-else :index="item.name">
       <template #title>
         <el-icon v-if="item.icon">
           <component :is="item.icon" />
@@ -29,7 +29,7 @@ import type { PropType } from "vue";
 import type { Component } from "vue";
 import { highlight } from "@/utils/common"; // 把 highlight 提取到 utils 或共享
 export interface MenuItem {
-  index: string;
+  name: string;
   title: string;
   icon?: string | Component;
   children?: MenuItem[];

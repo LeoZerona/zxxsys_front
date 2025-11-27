@@ -16,7 +16,6 @@
         <Fold v-show="!isCollapse" />
       </el-icon>
     </div>
-
     <el-menu
       :default-active="activeMenu"
       class="el-menu-vertical"
@@ -46,30 +45,30 @@ import type { MenuItem } from "./components/RecurseMenu.vue";
 
 const defaultMenu: MenuItem[] = [
   {
-    index: "dashboard",
+    name: "dashboard",
     title: "仪表盘",
     icon: Monitor,
   },
   {
-    index: "user",
+    name: "user",
     title: "用户管理",
     icon: User,
     children: [
-      { index: "user-list", title: "用户列表" },
-      { index: "user-role", title: "角色管理" },
+      { name: "user-list", title: "用户列表" },
+      { name: "user-role", title: "角色管理" },
     ],
   },
   {
-    index: "content",
+    name: "content",
     title: "内容管理",
     icon: Document,
     children: [
-      { index: "article-list", title: "文章列表" },
-      { index: "category", title: "分类管理" },
+      { name: "article-list", title: "文章列表" },
+      { name: "category", title: "分类管理" },
     ],
   },
   {
-    index: "settings",
+    name: "settings",
     title: "系统设置",
     icon: Setting,
   },
@@ -86,14 +85,14 @@ const menuData = computed(() =>
 );
 
 const emit = defineEmits<{
-  select: [index: string];
+  select: [name: string];
 }>();
 
 const isCollapse = ref(false);
 const menuKey = ref("");
 
-const handleSelect = (index: string) => {
-  emit("select", index);
+const handleSelect = (name: string) => {
+  emit("select", name);
 };
 
 function filterMenu(list: MenuItem[], key: string): MenuItem[] {
@@ -114,15 +113,6 @@ function filterMenu(list: MenuItem[], key: string): MenuItem[] {
     }
   });
   return res;
-}
-
-function highlight(text: string, keyword: string): string {
-  if (!keyword.trim()) return text;
-  const reg = new RegExp(`(${keyword})`, "gi");
-  return text.replace(
-    reg,
-    '<span style="background:#ff0;color:#000;">$1</span>'
-  );
 }
 
 let debounceTimer: number | null = null;
