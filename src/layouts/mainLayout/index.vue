@@ -44,7 +44,7 @@
           </div>
         </div>
 
-        <!-- 标签栏（已抽离） -->
+        <!-- 标签栏 -->
         <TabsBar
           :visited-tabs="visitedTabs"
           :active-tab="activeTab"
@@ -66,7 +66,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import rightMenu, { type MenuItem } from "./components/rightMenu.vue";
+import rightMenu from "./components/rightMenu/index.vue";
+import type { MenuItem } from "./components/rightMenu/components/RecurseMenu.vue";
 import TabsBar from "./components/TabsBar.vue";
 import type { ContextMenuType } from "@/components/contextMenu/index.vue";
 

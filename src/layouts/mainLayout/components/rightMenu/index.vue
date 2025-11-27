@@ -16,45 +16,6 @@
         <Fold v-show="!isCollapse" />
       </el-icon>
     </div>
-    <!-- <el-menu
-      :default-active="activeMenu"
-      class="el-menu-vertical"
-      background-color="#304156"
-      text-color="#bfcbd9"
-      active-text-color="#1890ff"
-      :collapse="isCollapse"
-      @select="handleSelect"
-    >
-      <template v-for="item in filteredMenu" :key="item.index">
-        <el-menu-item v-if="!item.children" :index="item.index">
-          <el-icon v-if="item.icon">
-            <component :is="item.icon" />
-          </el-icon>
-          <span v-html="highlight(item.title, menuKey)"></span>
-        </el-menu-item>
-
-        <el-sub-menu v-else :index="item.index">
-          <template #title>
-            <el-icon v-if="item.icon">
-              <component :is="item.icon" />
-            </el-icon>
-            <span v-html="highlight(item.title, menuKey)"></span>
-          </template>
-
-          <el-menu-item
-            v-for="sub in item.children"
-            :key="sub.index"
-            :index="sub.index"
-          >
-            <el-icon v-if="sub.icon">
-              <component :is="sub.icon" />
-            </el-icon>
-            <span v-html="highlight(sub.title, menuKey)"></span>
-          </el-menu-item>
-        </el-sub-menu>
-      </template>
-    </el-menu> -->
-
     <el-menu
       :default-active="activeMenu"
       class="el-menu-vertical"
@@ -68,8 +29,8 @@
     </el-menu>
   </aside>
 </template>
-
-<script setup lang="ts">
+  
+  <script setup lang="ts">
 import { ref, computed } from "vue";
 import type { PropType } from "vue";
 import {
@@ -79,8 +40,8 @@ import {
   Setting,
   Search,
 } from "@element-plus/icons-vue";
-import RecurseMenu from "./RecurseMenu.vue";
-import type { MenuItem } from "./RecurseMenu.vue";
+import RecurseMenu from "./components/RecurseMenu.vue";
+import type { MenuItem } from "./components/RecurseMenu.vue";
 
 const defaultMenu: MenuItem[] = [
   {
@@ -179,8 +140,8 @@ function handleSearch() {
 
 handleSearch();
 </script>
-
-<style scoped lang="scss">
+  
+  <style scoped lang="scss">
 @use "@/styles/globalVariable.scss" as g;
 .sidebar {
   background-color: g.$menuBg;
@@ -215,43 +176,6 @@ handleSearch();
       margin-left: 10px;
       font-size: 24px;
       cursor: pointer;
-    }
-  }
-
-  .el-menu-vertical {
-    border-right: none;
-
-    .el-sub-menu__title {
-      span {
-        width: 6vw;
-        overflow: hidden;
-        white-space: nowrap;
-        text-overflow: ellipsis;
-      }
-    }
-
-    .el-menu-item {
-      width: 100%;
-      color: g.$menuText;
-      span {
-        overflow: hidden;
-        white-space: nowrap;
-        text-overflow: ellipsis;
-      }
-      &:hover {
-        background-color: g.$menuHover;
-      }
-      &.is-active {
-        background-color: g.$menuActiveBg;
-        color: g.$menuActiveText;
-      }
-    }
-
-    .el-sub-menu__title {
-      color: g.$menuText;
-      &:hover {
-        background-color: g.$menuHover;
-      }
     }
   }
 }

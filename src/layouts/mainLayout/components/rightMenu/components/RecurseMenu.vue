@@ -45,3 +45,43 @@ defineProps({
   },
 });
 </script>
+<style scoped lang="scss">
+@use "@/styles/globalVariable.scss" as g;
+
+.el-menu-vertical {
+  border-right: none;
+
+  .el-sub-menu__title {
+    span {
+      width: 6vw;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+  }
+
+  .el-menu-item {
+    width: 100%;
+    color: g.$menuText;
+    span {
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+    &:hover {
+      background-color: g.$menuHover;
+    }
+    &.is-active {
+      background-color: g.$menuActiveBg;
+      color: g.$menuActiveText;
+    }
+  }
+
+  .el-sub-menu__title {
+    color: g.$menuText;
+    &:hover {
+      background-color: g.$menuHover;
+    }
+  }
+}
+</style>
