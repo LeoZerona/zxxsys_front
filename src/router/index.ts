@@ -23,9 +23,24 @@ const router = createRouter({
       component: () => import("@/pages/second/index.vue"),
       children: [
         {
-          path: "/test",
+          path: "/test",  // 测试页
           name: "test",
           component: () => import("@/pages/test/index.vue"),
+        },
+        {
+          path: "/originalQuestionBank",  // 原题库
+          name: "originalQuestionBank",
+          component: () => import("@/pages/originalQuestionBank/index.vue"),
+        },
+        {
+          path: "/CleaningWarehouse",  // 清洗库
+          name: "CleaningWarehouse",
+          component: () => import("@/pages/cleaningWarehouse/index.vue"),
+        },
+        {
+          path: "/examinationPaper",  // 试卷，测试用
+          name: "examinationPaper",
+          component: () => import("@/pages/examinationPaper/index.vue"),
         },
       ]
     },

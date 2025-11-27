@@ -82,7 +82,7 @@ const activeMenu = ref<string>("user-list");
 
 const customMenu: MenuItem[] = [
   {
-    name: "home",
+    name: "QuestionBankManagement",
     title: "题库管理",
     icon: "Document",
     children: [
@@ -90,26 +90,25 @@ const customMenu: MenuItem[] = [
       { name: "CleaningWarehouse", title: "清洗库", icon: "" },
     ],
   },
-  { name: "about", title: "试卷", icon: "InfoFilled", children: [] },
+  {
+    name: "examinationPaper",
+    title: "试卷",
+    icon: "Document",
+    children: [],
+  },
 ];
 
 interface Tab {
   name: string;
   title: string;
 }
-const visitedTabs = ref<Tab[]>([
-  { name: "user-list", title: "用户列表" },
-  { name: "user-list1", title: "用户列表" },
-]);
+const visitedTabs = ref<Tab[]>([]);
 const activeTab = ref<string>("user-list");
 
 const menuTitleMap: Record<string, string> = {
-  dashboard: "仪表盘",
-  "user-list": "用户列表",
-  "user-role": "角色管理",
-  "article-list": "文章列表",
-  category: "分类管理",
-  settings: "系统设置",
+  CleaningWarehouse: "清洗库",
+  originalQuestionBank: "原题库",
+  examinationPaper: "试卷",
 };
 
 const menuList = ref<ContextMenuType[]>([
@@ -130,18 +129,37 @@ const route = useRoute();
 function handleMenuSelect(name: string) {
   activeMenu.value = name;
   addTab(name);
-  // router.push({ name: index });
+  // router.push({ name });
 }
+import { nextTick } from "vue";
 
 /* 标签页相关方法 */
-const addTab = (name: string) => {
-  /* 略 */
+const addTab = async (name: string) => {
+  const title = menuTitleMap[name];
+  if (!title) return;
+  const exists = visitedTabs.value.some((tab) => tab.name === name);
+  if (!exists) {
+    visitedTabs.value.unshift({ name, title });
+  }
+  await nextTick();
+  activeTab.value = name;
 };
 const closeTab = (name: string) => {
-  /* 略 */
+  const idx = visitedTabs.value.findIndex((tab) => tab.name === name);
+  if (idx === -1) return;
+  visitedTabs.value.splice(idx, 1);
+  if (activeTab.value === name) {
+    const nextTab = visitedTabs.value[idx - 1] || visitedTabs.value[0];
+    if (nextTab) {
+      activeTab.value = nextTab.name;
+      router.push({ name: nextTab.name });
+    }
+  }
 };
 const handleTabClick = (pane: any) => {
-  /* 略 */
+  const name = pane.props.name;
+  activeMenu.value = name; // 同步菜单高亮
+  router.push({ name });
 };
 const handleTabClose = (name: any) => closeTab(name);
 const onMenuClick = (key: string) => {
@@ -210,6 +228,7 @@ watch(
   flex: 1;
   margin: 10px;
   overflow-y: auto;
+  padding: 10px;
   background-color: g.$contentBg;
 }
 @media (max-width: 768px) {
