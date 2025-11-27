@@ -16,7 +16,7 @@
         <Fold v-show="!isCollapse" />
       </el-icon>
     </div>
-    <el-menu
+    <!-- <el-menu
       :default-active="activeMenu"
       class="el-menu-vertical"
       background-color="#304156"
@@ -53,13 +53,24 @@
           </el-menu-item>
         </el-sub-menu>
       </template>
+    </el-menu> -->
+
+    <el-menu
+      :default-active="activeMenu"
+      class="el-menu-vertical"
+      background-color="#304156"
+      text-color="#bfcbd9"
+      active-text-color="#1890ff"
+      :collapse="isCollapse"
+      @select="handleSelect"
+    >
+      <RecurseMenu :menuList="filteredMenu" :keyword="menuKey" />
     </el-menu>
   </aside>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import type { Component } from "vue";
 import type { PropType } from "vue";
 import {
   Monitor,
@@ -68,13 +79,8 @@ import {
   Setting,
   Search,
 } from "@element-plus/icons-vue";
-
-export interface MenuItem {
-  index: string;
-  title: string;
-  icon?: string | Component;
-  children?: MenuItem[];
-}
+import RecurseMenu from "./RecurseMenu.vue";
+import type { MenuItem } from "./RecurseMenu.vue";
 
 const defaultMenu: MenuItem[] = [
   {

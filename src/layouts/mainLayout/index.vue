@@ -90,7 +90,15 @@ const customMenu: MenuItem[] = [
         index: "dsdsd",
         title: "试卷22",
         icon: "InfoFilled",
-        children: [{ index: "dsd", title: "清洗库11", icon: "" }],
+        children: [
+          { index: "dsd", title: "清洗库11", icon: "" },
+          {
+            index: "sdaasdasd",
+            title: "试卷",
+            icon: "InfoFilled",
+            children: [{ index: "wcsdfsd", title: "清洗库11", icon: "" }],
+          },
+        ],
       },
     ],
   },
