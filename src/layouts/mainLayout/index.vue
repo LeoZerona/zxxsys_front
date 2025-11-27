@@ -129,7 +129,7 @@ const route = useRoute();
 function handleMenuSelect(name: string) {
   activeMenu.value = name;
   addTab(name);
-  // router.push({ name });
+  router.push({ name });
 }
 import { nextTick } from "vue";
 
