@@ -77,6 +77,7 @@ function onTabRemove(name: TabPaneName) {
 
   .el-tabs {
     flex: 1;
+    overflow: hidden;
     :deep(.el-tabs__header) {
       margin: 0;
       border-bottom: none;
@@ -117,5 +118,29 @@ function onTabRemove(name: TabPaneName) {
     margin-right: 6px;
     vertical-align: middle;
   }
+}
+/* 隐藏 ElementPlus 自带的左右箭头 */
+:deep(.el-tabs__nav-prev),
+:deep(.el-tabs__nav-next) {
+  display: none !important;
+}
+
+/* 给导航栏加上滚轮能力 */
+:deep(.el-tabs__header) {
+  overflow-x: auto; /* 横向超出时出现滚动条 */
+  scrollbar-width: none; /* Firefox 隐藏滚动条 */
+  -ms-overflow-style: none; /* IE/Edge 隐藏滚动条 */
+  &::-webkit-scrollbar {
+    display: none; /* Chrome/Safari 隐藏滚动条 */
+  }
+}
+
+/* 让滚轮事件作用在 header 上 */
+:deep(.el-tabs__header) {
+  pointer-events: auto; /* 默认即可，保险写一下 */
+}
+
+:deep(.el-tabs__nav-wrap.is-scrollable) {
+  padding: 0px;
 }
 </style>
