@@ -1,26 +1,20 @@
 <template>
   <nav class="tabs-container" @contextmenu.prevent="openMenu">
-    <el-scrollbar ref="tabsScrollbarRef">
-      <el-tabs
-        :model-value="activeTab"
-        type="card"
-        closable
-        @tab-click="onTabClick"
-        @tab-remove="onTabRemove"
-      >
-        <el-tab-pane
-          v-for="tab in visitedTabs"
-          :key="tab.name"
-          :name="tab.name"
-        >
-          <template #label>
-            <span :class="{ 'active-dot': tab.name === activeTab }">
-              {{ tab.title }}
-            </span>
-          </template>
-        </el-tab-pane>
-      </el-tabs>
-    </el-scrollbar>
+    <el-tabs
+      :model-value="activeTab"
+      type="card"
+      closable
+      @tab-click="onTabClick"
+      @tab-remove="onTabRemove"
+    >
+      <el-tab-pane v-for="tab in visitedTabs" :key="tab.name" :name="tab.name">
+        <template #label>
+          <span :class="{ 'active-dot': tab.name === activeTab }">
+            {{ tab.title }}
+          </span>
+        </template>
+      </el-tab-pane>
+    </el-tabs>
 
     <ContextMenu
       ref="ctxRef"
@@ -86,7 +80,6 @@ function onTabRemove(name: TabPaneName) {
     :deep(.el-tabs__header) {
       margin: 0;
       border-bottom: none;
-      white-space: nowrap;
     }
     :deep(.el-tabs__nav) {
       border: none;
