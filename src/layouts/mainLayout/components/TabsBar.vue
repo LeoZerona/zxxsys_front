@@ -86,6 +86,7 @@ function onTabRemove(name: TabPaneName) {
     :deep(.el-tabs__header) {
       margin: 0;
       border-bottom: none;
+      white-space: nowrap;
     }
     :deep(.el-tabs__nav) {
       border: none;
