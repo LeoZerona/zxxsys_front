@@ -1,14 +1,11 @@
 import { createRouter, createWebHistory } from "vue-router";
 
-/* 布局 */
-const mainLayout = () => import("@/layouts/mainLayout/index.vue");
-
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: "/",
-      alias: ['/login'],
+      alias: ["/login"],
       name: "login",
       component: () => import("@/pages/login/index.vue"),
     },
@@ -23,26 +20,38 @@ const router = createRouter({
       component: () => import("@/pages/second/index.vue"),
       children: [
         {
-          path: "/test",  // 测试页
+          path: "test", // 测试页
           name: "test",
           component: () => import("@/pages/test/index.vue"),
         },
         {
-          path: "/originalQuestionBank",  // 原题库
+          path: "originalQuestionBank", // 原题库
           name: "originalQuestionBank",
           component: () => import("@/pages/originalQuestionBank/index.vue"),
         },
         {
-          path: "/CleaningWarehouse",  // 清洗库
+          path: "cleaningWarehouse", // 清洗库
           name: "CleaningWarehouse",
           component: () => import("@/pages/cleaningWarehouse/index.vue"),
         },
         {
-          path: "/examinationPaper",  // 试卷，测试用
+          path: "examinationPaper", // 试卷，测试用
           name: "examinationPaper",
           component: () => import("@/pages/examinationPaper/index.vue"),
         },
-      ]
+        {
+          path: "questionBankDetail/:id", // 题库内容详情页
+          name: "questionBankDetail",
+          component: () => import("@/pages/originalQuestionBank/detail/index.vue"),
+          props: true,
+        },
+        {
+          path: "questionTypeDetail/:bankId/:type", // 题目类型专门页面
+          name: "questionTypeDetail",
+          component: () => import("@/pages/originalQuestionBank/questionType/index.vue"),
+          props: true,
+        },
+      ],
     },
     {
       path: "/:pathMatch(.*)*",

@@ -242,17 +242,29 @@ function handleRegister() {
 }
 
 /* 5. 鼠标视差 */
-document.addEventListener("mousemove", (e) => {
-  const x = e.clientX / window.innerWidth;
-  const y = e.clientY / window.innerHeight;
-  document
-    .querySelectorAll<HTMLElement>(".geometric-shape")
-    .forEach((el, i) => {
-      const speed = (i + 1) * 0.5;
-      el.style.transform = `translate(${(x - 0.5) * speed * 20}px, ${
-        (y - 0.5) * speed * 20
-      }px)`;
-    });
+let mousemoveHandler: ((e: MouseEvent) => void) | null = null;
+
+onMounted(() => {
+  mousemoveHandler = (e: MouseEvent) => {
+    const x = e.clientX / window.innerWidth;
+    const y = e.clientY / window.innerHeight;
+    document
+      .querySelectorAll<HTMLElement>(".geometric-shape")
+      .forEach((el, i) => {
+        const speed = (i + 1) * 0.5;
+        el.style.transform = `translate(${(x - 0.5) * speed * 20}px, ${
+          (y - 0.5) * speed * 20
+        }px)`;
+      });
+  };
+  document.addEventListener("mousemove", mousemoveHandler);
+});
+
+onUnmounted(() => {
+  if (mousemoveHandler) {
+    document.removeEventListener("mousemove", mousemoveHandler);
+    mousemoveHandler = null;
+  }
 });
 </script>
 

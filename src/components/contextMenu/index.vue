@@ -82,12 +82,12 @@ const popperOptions = ref({
 
 /* 供父组件调用的唯一入口
     例：@contextmenu.prevent="openContextMenu($event, myMenuList)"
+    支持 el-tabs 和 el-tag 两种标签
 */
 function openContextMenu(e: MouseEvent) {
-  const item = (e.target as HTMLElement).closest(".el-tabs__item");
+  // 尝试查找 el-tabs__item 或 el-tag
+  const item = (e.target as HTMLElement).closest(".el-tabs__item, .el-tag");
   if (!item) return;
-  const paneName = item.getAttribute("aria-controls")?.replace("pane-", "");
-  if (!paneName) return;
 
   e.preventDefault();
 

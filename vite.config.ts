@@ -5,8 +5,6 @@ import AutoImport from "unplugin-auto-import/vite";
 import Components from "unplugin-vue-components/vite";
 import { ElementPlusResolver } from "unplugin-vue-components/resolvers";
 
-// import Pages from "vite-plugin-pages";
-// Pages({ dirs: "src/pages", routeBlockLang: "yaml" }),  // 自动生成路由文件的插件
 export default defineConfig({
   plugins: [
     vue(),

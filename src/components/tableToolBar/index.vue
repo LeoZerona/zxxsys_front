@@ -1,77 +1,104 @@
 <template>
   <section class="table-toolbar">
-    <!-- 左侧按钮群 -->
-    <article class="toolbar-btn-group">
-      <el-button type="primary" :icon="Plus" @click="emit('add')"
-        >添加</el-button
+    <!-- 左侧操作按钮区 -->
+    <div class="toolbar-left">
+      <div class="btn-group-primary">
+        <el-button type="primary" :icon="Plus" size="default" @click="emit('add')">
+          添加
+        </el-button>
+        <el-button :icon="Edit" size="default" @click="emit('edit')">修改</el-button>
+        <el-button :icon="Delete" size="default" @click="emit('del')">删除</el-button>
+      </div>
+      <el-divider direction="vertical" class="divider" />
+      <div class="btn-group-secondary">
+        <el-upload
+          class="upload-btn"
+          action=""
+          accept=".xlsx,.xls"
+          :show-file-list="false"
+          :before-upload="beforeUpload"
+        >
+          <el-button :icon="Upload" size="default">导入</el-button>
+        </el-upload>
+        <el-button :icon="Download" size="default" @click="emit('export')">导出</el-button>
+      </div>
+    </div>
+
+    <!-- 右侧搜索和设置区 -->
+    <div class="toolbar-right">
+      <!-- 搜索框 -->
+      <div class="search-wrapper">
+        <el-input
+          v-model="keyword"
+          :placeholder="placeholder"
+          clearable
+          class="search-input"
+          size="default"
+          @keyup.enter="handleSearch"
+          @clear="handleSearch"
+        >
+          <template #prefix>
+            <el-icon class="search-icon"><Search /></el-icon>
+          </template>
+        </el-input>
+        <el-button 
+          type="primary" 
+          :icon="Search" 
+          size="default"
+          class="search-btn"
+          @click="handleSearch"
+        >
+          搜索
+        </el-button>
+      </div>
+
+      <!-- 高级筛选按钮 -->
+      <el-button 
+        :icon="Filter" 
+        size="default"
+        :type="showAdv ? 'primary' : 'default'"
+        class="filter-btn"
+        @click="showAdv = !showAdv"
       >
-      <el-button :icon="Edit" @click="emit('edit')">修改</el-button>
-      <el-button :icon="Delete" @click="emit('del')">删除</el-button>
+        高级筛选
+      </el-button>
 
-      <el-upload
-        class="upload-btn"
-        action=""
-        accept=".xlsx,.xls"
-        :show-file-list="false"
-        :before-upload="beforeUpload"
-      >
-        <el-button :icon="Upload">导入</el-button>
-      </el-upload>
-
-      <el-button :icon="Download" @click="emit('export')">导出</el-button>
-    </article>
-
-    <!-- 右侧搜索区 -->
-    <article class="toolbar-search-group">
-      <el-input
-        v-model="keyword"
-        :placeholder="placeholder"
-        clearable
-        class="search-input"
-        @keyup.enter="emit('search', keyword)"
-      >
-        <template #append>
-          <el-button :icon="Search" @click="emit('search', keyword)" />
-        </template>
-      </el-input>
-
-      <el-button :icon="Filter" circle @click="showAdv = !showAdv" />
-
-      <!-- 列显隐 – el-select 多选 -->
+      <!-- 列显隐选择器 -->
       <el-select
         v-model="checkedCols"
         multiple
         collapse-tags
         collapse-tags-tooltip
-        placeholder="显示字段"
+        placeholder="列设置"
         class="column-select"
-        @change="emit('columnChange', checkedCols)"
+        size="default"
+        @change="handleColumnChange"
       >
         <template #prefix>
-          <el-icon><View /></el-icon>
+          <el-icon class="column-icon"><Setting /></el-icon>
         </template>
-
         <el-option
           v-for="c in allColumns"
           :key="c.prop"
           :label="c.label"
           :value="c.prop"
         >
-          <span>{{ c.label }}</span>
-          <el-tag v-if="checkedCols.includes(c.prop)" size="small" round
-            >✓</el-tag
-          >
+          <div class="option-item">
+            <span>{{ c.label }}</span>
+            <span v-if="checkedCols.includes(c.prop)" class="check-badge">
+              <el-icon class="check-icon"><Check /></el-icon>
+            </span>
+          </div>
         </el-option>
-
         <template #footer>
           <div class="select-footer">
-            <el-button text @click="handleCheckAll(true)">全选</el-button>
-            <el-button text @click="handleInvert">反选</el-button>
-            <el-button text @click="handleCheckAll(false)">清空</el-button>
+            <el-button text size="small" @click="handleCheckAll(true)">全选</el-button>
+            <el-button text size="small" @click="handleInvert">反选</el-button>
+            <el-button text size="small" @click="handleCheckAll(false)">清空</el-button>
           </div>
         </template>
       </el-select>
-    </article>
+    </div>
   </section>
 
   <!-- 高级搜索 -->
@@ -125,6 +152,7 @@
         <el-form-item>
           <el-button type="primary" @click="handleAdvSearch">查询</el-button>
           <el-button @click="resetAdv">重置</el-button>
+          <el-button @click="resetAll">重置全部</el-button>
         </el-form-item>
       </el-form>
     </section>
@@ -141,9 +169,9 @@ import {
   Download,
   Search,
   Filter,
-  View,
+  Setting,
+  Check,
 } from "@element-plus/icons-vue";
-import { ElMessage } from "element-plus";
 
 /* ===== 类型 ===== */
 interface IOption {
@@ -162,8 +190,17 @@ const props = withDefaults(
   defineProps<{
     placeholder?: string;
     columns: IColumn[];
+    // 支持从父组件传入初始值
+    modelKeyword?: string;
+    modelAdvSearch?: Record<string, any>;
+    modelCheckedColumns?: string[];
   }>(),
-  { placeholder: "请输入关键字" }
+  { 
+    placeholder: "请输入关键字",
+    modelKeyword: "",
+    modelAdvSearch: () => ({}),
+    modelCheckedColumns: () => []
+  }
 );
 
 const emit = defineEmits<{
@@ -173,56 +210,134 @@ const emit = defineEmits<{
   import: [file: File];
   export: [];
   search: [kw: string];
+  "update:modelKeyword": [kw: string];
   advSearch: [payload: Record<string, any>];
+  "update:modelAdvSearch": [payload: Record<string, any>];
   columnChange: [visibleCols: string[]];
+  "update:modelCheckedColumns": [visibleCols: string[]];
+  reset: []; // 重置事件
 }>();
 
 /* ===== 普通搜索 ===== */
-const keyword = ref("");
+const keyword = ref(props.modelKeyword || "");
+// 监听 props 变化，同步到内部状态
+watch(() => props.modelKeyword, (val) => {
+  if (val !== undefined && val !== keyword.value) {
+    keyword.value = val;
+  }
+}, { immediate: true });
+// 监听内部状态变化，同步到父组件
+watch(keyword, (val) => {
+  emit("update:modelKeyword", val);
+});
 
 /* ===== 高级搜索 ===== */
 const showAdv = ref(false);
 const advModel = reactive<Record<string, any>>({});
+
+// 初始化高级搜索模型
+function initAdvModel() {
+  props.columns.forEach((c) => {
+    if (props.modelAdvSearch && props.modelAdvSearch[c.prop] !== undefined) {
+      advModel[c.prop] = props.modelAdvSearch[c.prop];
+    } else {
+      advModel[c.prop] = undefined;
+    }
+  });
+}
+
+// 监听 columns 变化，重新初始化
 watch(
   () => props.columns,
-  (cols) => cols.forEach((c) => (advModel[c.prop] = undefined)),
+  () => {
+    initAdvModel();
+  },
   { immediate: true }
 );
+
+// 监听父组件传入的 modelAdvSearch 变化
+watch(
+  () => props.modelAdvSearch,
+  (val) => {
+    if (val) {
+      Object.keys(advModel).forEach((k) => {
+        if (val[k] !== undefined) {
+          advModel[k] = val[k];
+        }
+      });
+    }
+  },
+  { deep: true }
+);
+
 function handleAdvSearch() {
-  emit("advSearch", { ...advModel });
+  const payload = { ...advModel };
+  emit("advSearch", payload);
+  emit("update:modelAdvSearch", payload);
 }
+
 function resetAdv() {
   Object.keys(advModel).forEach((k) => (advModel[k] = undefined));
+  emit("update:modelAdvSearch", {});
+  emit("advSearch", {});
+}
+
+// 重置所有筛选条件
+function resetAll() {
+  keyword.value = "";
+  resetAdv();
+  emit("reset");
 }
 
 /* ===== 列显隐 ===== */
 const allColumns = computed(() => props.columns);
-const checkedCols = ref<string[]>([]);
-watch(allColumns, (cols) => (checkedCols.value = cols.map((c) => c.prop)), {
-  immediate: true,
-});
-watch(checkedCols, (v) => emit("columnChange", v));
-
-const checkAll = computed({
-  get: () =>
-    checkedCols.value.length > 0 &&
-    checkedCols.value.length === allColumns.value.length,
-  set: (val) => handleCheckAll(val),
-});
-const isInd = computed(
-  () =>
-    checkedCols.value.length > 0 &&
-    checkedCols.value.length < allColumns.value.length
+const checkedCols = ref<string[]>(
+  props.modelCheckedColumns && props.modelCheckedColumns.length > 0
+    ? [...props.modelCheckedColumns]
+    : props.columns.map((c) => c.prop)
 );
-// function handleCheckAll(val: boolean) {
-//   checkedCols.value = val ? allColumns.value.map((c) => c.prop) : [];
-// }
-// function handleInvert() {
-//   const set = new Set(checkedCols.value);
-//   checkedCols.value = allColumns.value
-//     .map((c) => c.prop)
-//     .filter((p) => !set.has(p));
-// }
+
+// 监听 props 变化
+watch(
+  () => props.modelCheckedColumns,
+  (val) => {
+    if (val && val.length > 0 && JSON.stringify(val) !== JSON.stringify(checkedCols.value)) {
+      checkedCols.value = [...val];
+    }
+  },
+  { immediate: true, deep: true }
+);
+
+// 监听 columns 变化，更新 checkedCols
+watch(
+  allColumns,
+  (cols) => {
+    // 如果父组件没有传入初始值，则默认全选
+    if (!props.modelCheckedColumns || props.modelCheckedColumns.length === 0) {
+      checkedCols.value = cols.map((c) => c.prop);
+    }
+  },
+  { immediate: true }
+);
+
+// 列显隐变化处理
+function handleColumnChange(val: string[]) {
+  checkedCols.value = val;
+  emit("columnChange", [...val]);
+  emit("update:modelCheckedColumns", [...val]);
+}
+
+
+// 监听内部状态变化，同步到父组件
+watch(
+  checkedCols,
+  (v) => {
+    emit("columnChange", [...v]);
+    emit("update:modelCheckedColumns", [...v]);
+  },
+  { deep: true }
+);
+
 
 /* 列显隐 – 全选 / 反选 / 清空 */
 function handleCheckAll(checked: boolean) {
@@ -234,13 +349,26 @@ function handleInvert() {
     .map((c) => c.prop)
     .filter((p) => !set.has(p));
 }
-const dropVisible = ref(false);
+
+/* ===== 普通搜索处理 ===== */
+function handleSearch() {
+  emit("search", keyword.value);
+}
 
 /* ===== 导入 ===== */
 function beforeUpload(file: File) {
   emit("import", file);
   return false;
 }
+
+// 暴露重置方法给父组件
+defineExpose({
+  resetAll,
+  resetAdv,
+  keyword,
+  advModel,
+  checkedCols,
+});
 </script>
   
   <style scoped lang="scss">
@@ -248,86 +376,175 @@ function beforeUpload(file: File) {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
+  padding: 12px 20px;
   background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  margin-bottom: 12px;
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  margin-bottom: 16px;
+  gap: 16px;
+  flex-wrap: nowrap;
 }
 
-.toolbar-btn-group {
+/* 左侧操作区 */
+.toolbar-left {
   display: flex;
-  gap: 8px;
   align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+
+  .btn-group-primary,
+  .btn-group-secondary {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .divider {
+    height: 24px;
+    margin: 0;
+    border-color: #e4e7ed;
+  }
+
+  .upload-btn {
+    display: inline-block;
+  }
 }
 
-.upload-btn {
-  display: inline-block;
-}
-
-.toolbar-search-group {
+/* 右侧搜索和设置区 */
+.toolbar-right {
   display: flex;
-  gap: 8px;
   align-items: center;
-  .search-input {
-    width: 240px;
-  }
-}
+  gap: 12px;
+  flex: 1;
+  justify-content: flex-end;
+  min-width: 0;
 
-/* 列显隐下拉 */
-.column-drop {
-  .active {
-    color: var(--el-color-primary);
-    transform: rotate(180deg);
-    transition: transform 0.2s;
-  }
-}
-.column-menu {
-  padding: 8px 12px;
-  width: 220px;
-  .menu-header {
+  .search-wrapper {
     display: flex;
-    justify-content: space-between;
-    margin-bottom: 8px;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    max-width: 400px;
+    min-width: 200px;
+
+    .search-input {
+      flex: 1;
+      min-width: 180px;
+
+      :deep(.el-input__wrapper) {
+        padding-left: 12px;
+        padding-right: 12px;
+      }
+
+      :deep(.el-input__prefix) {
+        left: 12px;
+        width: auto;
+      }
+
+      .search-icon {
+        color: #909399;
+        font-size: 16px;
+        margin-right: 8px;
+      }
+    }
+
+    .search-btn {
+      flex-shrink: 0;
+    }
   }
-  .column-group {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    max-height: 260px;
-    overflow-y: auto;
-    .column-item {
-      width: 100%;
-      height: 32px;
-      line-height: 32px;
+
+  .filter-btn {
+    flex-shrink: 0;
+    transition: all 0.3s;
+  }
+
+  .column-select {
+    width: 140px;
+    flex-shrink: 0;
+
+    .column-icon {
+      color: #909399;
+      font-size: 16px;
+    }
+
+    :deep(.el-select__tags) {
+      max-width: calc(100% - 30px);
     }
   }
 }
 
-/* 高级搜索 */
+/* 下拉选项样式 */
+:deep(.el-select-dropdown__item) {
+  // 隐藏默认的checkbox
+  .el-checkbox {
+    display: none;
+  }
+  
+  // 调整选项内容布局
+  .option-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    padding-left: 0;
+
+    .check-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      background-color: var(--el-color-primary);
+      border-radius: 50%;
+      flex-shrink: 0;
+
+      .check-icon {
+        color: #fff;
+        font-size: 12px;
+        font-weight: bold;
+      }
+    }
+  }
+}
+
+/* 高级搜索面板 */
 .adv-panel {
-  background: #fafbfc;
-  padding: 16px;
-  border-radius: 8px;
-  margin-bottom: 12px;
-}
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  border: 1px solid #e4e7ed;
 
-/* 让 el-select 宽度更紧凑 */
-.column-select {
-  width: 180px;
-  .el-icon {
-    margin-right: 4px;
-  }
-  .el-tag {
-    margin-left: auto;
+  :deep(.el-form) {
+    .el-form-item {
+      margin-bottom: 16px;
+    }
   }
 }
 
-/* 底部按钮栏 */
-.select-footer {
-  display: flex;
-  justify-content: space-between;
-  padding: 8px 12px;
-  border-top: 1px solid var(--el-border-color-lighter);
+/* 响应式适配 */
+@media (max-width: 1200px) {
+  .toolbar-right {
+    .search-wrapper {
+      max-width: 300px;
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .table-toolbar {
+    flex-wrap: wrap;
+    padding: 12px;
+  }
+
+  .toolbar-left {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .toolbar-right {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 </style>

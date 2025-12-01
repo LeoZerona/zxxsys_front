@@ -1,35 +1,23 @@
 <template>
   <div class="repo-table">
     <TableToolBar
-      placeholder="按姓名/工号搜索"
-      :columns="columns1"
+      ref="tableToolBarRef"
+      placeholder="搜索题库名称、占用空间、题目数量"
+      :columns="tableToolBarColumns"
+      v-model:model-keyword="searchKeyword"
+      v-model:model-adv-search="advSearchParams"
+      v-model:model-checked-columns="checkedCols"
       @add="onAdd"
       @edit="onEdit"
       @del="onDel"
       @import="onImport"
       @export="onExport"
       @search="onSearch"
-      @advSearch="onAdvSearch"
-      @columnChange="onColumnChange"
+      @adv-search="onAdvSearch"
+      @column-change="onColumnChange"
+      @reset="handleReset"
     />
-    <!-- 顶部工具栏 -->
-    <div class="toolbar">
-      <el-button type="primary" :icon="Plus" @click="handleCreate">
-        新建题库
-      </el-button>
-
-      <div class="search-box">
-        <el-input
-          v-model="keyword"
-          placeholder="搜索题库名称"
-          clearable
-          @keyup.enter="handleSearch"
-        />
-        <el-button type="primary" :icon="Search" @click="handleSearch">
-          搜索
-        </el-button>
-      </div>
-    </div>
+    <!-- 顶部工具栏（已集成到 TableToolBar 中，可删除或保留用于其他操作） -->
 
     <!-- 表格：列、按钮全部由 columns 配置驱动 -->
     <el-table
@@ -41,7 +29,7 @@
       class="data-table"
     >
       <el-table-column
-        v-for="col in columns"
+        v-for="col in visibleColumns"
         :key="col.prop"
         :prop="col.prop"
         :label="col.label"
@@ -93,41 +81,43 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed, watch } from "vue";
+import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import TableToolBar from "@/components/tableToolBar/index.vue";
 
-const columns1 = ref([
-  { label: "姓名", prop: "name" },
-  {
-    label: "性别",
-    prop: "gender",
-    searchType: "select",
-    options: [
-      { label: "男", value: 1 },
-      { label: "女", value: 0 },
-    ],
-  },
-  { label: "生日", prop: "birth", searchType: "date" },
-  { label: "入职日期", prop: "entry", searchType: "dateRange" },
-]);
+const router = useRouter();
 
-// const visibleColumns = computed(() =>
-//   columns.value.filter((c) => checkedCols.value.includes(c.prop))
-// );
-const checkedCols = ref(columns1.value.map((c) => c.prop));
-
-function onAdd() {}
-function onEdit() {}
-function onDel() {}
-function onImport(file: File) {}
-function onExport() {}
-function onSearch(kw: string) {}
-function onAdvSearch(payload: Record<string, any>) {}
-function onColumnChange(cols: string[]) {
-  checkedCols.value = cols;
+// TableToolBar 列配置类型
+interface IColumn {
+  label: string;
+  prop: string;
+  searchType?: "input" | "select" | "date" | "dateRange";
+  options?: { label: string; value: string | number }[];
 }
 
+// 筛选条件状态 - 与 tableToolBar 组件关联
+const searchKeyword = ref("");
+const advSearchParams = ref<Record<string, any>>({});
+
+// 表格工具栏引用
+const tableToolBarRef = ref<InstanceType<typeof TableToolBar>>();
+
+function onAdd() {
+  ElMessage.info("添加功能");
+}
+function onEdit() {
+  ElMessage.info("编辑功能");
+}
+function onDel() {
+  ElMessage.info("删除功能");
+}
+function onImport(file: File) {
+  ElMessage.success(`导入文件: ${file.name}`);
+}
+function onExport() {
+  ElMessage.info("导出功能");
+}
 /* ===================== 类型 ===================== */
 interface RepoItem {
   id: number;
@@ -152,83 +142,13 @@ interface Column {
   align?: "left" | "center" | "right";
   fixed?: "left" | "right";
   formatter?: (val: any, row: RepoItem) => string;
-  actionButtons?: ActionButton[]; // 有值即视为“操作列”
+  actionButtons?: ActionButton[]; // 有值即视为"操作列"
+  // TableToolBar 筛选相关配置
+  searchType?: "input" | "select" | "date" | "dateRange";
+  options?: { label: string; value: string | number }[];
 }
 
-/* ===================== 列配置（按钮也在这里） ===================== */
-const columns = ref<Column[]>([
-  {
-    prop: "createdAt",
-    label: "创建日期",
-    width: 180,
-    formatter: (val) => formatDate(val),
-  },
-  {
-    prop: "storage",
-    label: "占用空间",
-    width: 140,
-    formatter: (val) => formatStorage(val),
-  },
-  {
-    prop: "questionCount",
-    label: "题目数量",
-    width: 120,
-  },
-  {
-    prop: "action",
-    label: "操作",
-    minWidth: 120,
-    actionButtons: [
-      { text: "查看题库内容", type: "primary", click: handleView },
-      { text: "删除", type: "danger", click: handleDel },
-    ],
-  },
-]);
-
-/* ===================== 状态 ===================== */
-const loading = ref(false);
-const keyword = ref("");
-const page = ref(1);
-const pageSize = ref(10);
-const total = ref(0);
-const tableData = ref<RepoItem[]>([]);
-
-/* ===================== 生命周期 ===================== */
-onMounted(() => fetchData());
-
-/* ===================== 方法 ===================== */
-async function fetchData() {
-  loading.value = true;
-  try {
-    const res = await mockApi({
-      page: page.value,
-      pageSize: pageSize.value,
-      keyword: keyword.value,
-    });
-    tableData.value = res.list;
-    total.value = res.total;
-  } catch {
-    ElMessage.error("数据加载失败");
-  } finally {
-    loading.value = false;
-  }
-}
-
-function handleSearch() {
-  page.value = 1;
-  fetchData();
-}
-function handleCreate() {
-  ElMessage.info("新建功能待实现");
-}
-function handleView(row: RepoItem) {
-  ElMessage.info(`查看题库 ID：${row.id}`);
-}
-function handleDel(row: RepoItem) {
-  ElMessage.warning(`删除题库 ID：${row.id}（这里调接口）`);
-}
-
-/* ===================== 工具函数 ===================== */
+/* ===================== 工具函数（需要在列配置之前定义） ===================== */
 const formatDate = (d: string | Date) => {
   const date = new Date(d);
   const Y = date.getFullYear();
@@ -247,18 +167,209 @@ const formatStorage = (bytes: number) => {
   return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
 };
 
+/* ===================== 业务方法（需要在列配置之前定义） ===================== */
+function handleView(row: RepoItem) {
+  // 跳转到题库内容详情页
+  router.push({ name: "questionBankDetail", params: { id: row.id } });
+}
+
+function handleDel(row: RepoItem) {
+  ElMessage.warning(`删除题库 ID：${row.id}（这里调接口）`);
+}
+
+/* ===================== 列配置（按钮也在这里） ===================== */
+const columns = ref<Column[]>([
+  {
+    prop: "createdAt",
+    label: "创建日期",
+    width: 180,
+    formatter: (val) => formatDate(val),
+    searchType: "dateRange", // 支持日期范围筛选
+  },
+  {
+    prop: "storage",
+    label: "占用空间",
+    width: 140,
+    formatter: (val) => formatStorage(val),
+    searchType: "input", // 支持输入筛选
+  },
+  {
+    prop: "questionCount",
+    label: "题目数量",
+    width: 120,
+    searchType: "input", // 支持输入筛选
+  },
+  {
+    prop: "action",
+    label: "操作",
+    minWidth: 120,
+    actionButtons: [
+      { text: "查看题库内容", type: "primary", click: handleView },
+      { text: "删除", type: "danger", click: handleDel },
+    ],
+  },
+]);
+
+// 将表格列配置转换为 TableToolBar 需要的格式（排除操作列）
+const tableToolBarColumns = computed<IColumn[]>(() => {
+  return columns.value
+    .filter((col) => !col.actionButtons) // 排除操作列
+    .map((col) => ({
+      label: col.label,
+      prop: col.prop,
+      searchType: col.searchType || "input",
+      options: col.options,
+    }));
+});
+
+// 列显隐状态（排除操作列）
+const checkedCols = ref<string[]>(
+  columns.value
+    .filter((col) => !col.actionButtons)
+    .map((col) => col.prop)
+);
+
+// 监听 columns 变化，更新 checkedCols
+watch(
+  () => columns.value,
+  () => {
+    const dataColumns = columns.value
+      .filter((col) => !col.actionButtons)
+      .map((col) => col.prop);
+    // 只有当 checkedCols 为空或与当前列不匹配时才更新
+    if (checkedCols.value.length === 0 || 
+        JSON.stringify([...checkedCols.value].sort()) !== JSON.stringify([...dataColumns].sort())) {
+      checkedCols.value = dataColumns;
+    }
+  },
+  { immediate: true }
+);
+
+// 根据 checkedCols 过滤显示的列（操作列始终显示）
+const visibleColumns = computed(() => {
+  return columns.value.filter((col) => {
+    // 操作列始终显示
+    if (col.actionButtons) return true;
+    // 其他列根据 checkedCols 决定是否显示
+    return checkedCols.value.includes(col.prop);
+  });
+});
+
+/* ===================== 状态 ===================== */
+const loading = ref(false);
+const page = ref(1);
+const pageSize = ref(10);
+const total = ref(0);
+const tableData = ref<RepoItem[]>([]);
+
+/* ===================== 方法 ===================== */
+async function fetchData() {
+  loading.value = true;
+  try {
+    const res = await mockApi({
+      page: page.value,
+      pageSize: pageSize.value,
+      keyword: searchKeyword.value, // 使用关联的搜索关键词
+      ...advSearchParams.value, // 合并高级搜索参数
+    });
+    tableData.value = res.list;
+    total.value = res.total;
+  } catch {
+    ElMessage.error("数据加载失败");
+  } finally {
+    loading.value = false;
+  }
+}
+
+// 重置所有筛选条件
+function handleReset() {
+  searchKeyword.value = "";
+  advSearchParams.value = {};
+  page.value = 1;
+  fetchData();
+}
+
+// TableToolBar 事件处理
+function onSearch(kw: string) {
+  searchKeyword.value = kw;
+  page.value = 1;
+  fetchData();
+}
+
+function onAdvSearch(payload: Record<string, any>) {
+  advSearchParams.value = { ...payload };
+  page.value = 1;
+  fetchData();
+}
+
+function onColumnChange(cols: string[]) {
+  // 更新列显隐状态
+  checkedCols.value = [...cols];
+}
+
+/* ===================== 生命周期 ===================== */
+onMounted(() => fetchData());
+
+
 /* ===================== Mock API ===================== */
-function mockApi(p: { page: number; pageSize: number; keyword?: string }) {
+function mockApi(p: {
+  page: number;
+  pageSize: number;
+  keyword?: string;
+  createdAt?: string[]; // 日期范围 [start, end]
+  storage?: string; // 占用空间筛选
+  questionCount?: string; // 题目数量筛选
+}) {
   return new Promise<{ list: RepoItem[]; total: number }>((resolve) => {
     setTimeout(() => {
-      const all: RepoItem[] = Array.from({ length: 137 }, (_, idx) => ({
+      let all: RepoItem[] = Array.from({ length: 137 }, (_, idx) => ({
         id: idx + 1,
         createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * idx),
         storage: Math.floor(Math.random() * 1024 * 1024 * 100),
         questionCount: Math.floor(Math.random() * 5000),
-      })).filter((v) =>
-        p.keyword ? v.id.toString().includes(p.keyword) : true
-      );
+      }));
+
+      // 普通关键词搜索（搜索 ID、占用空间、题目数量）
+      if (p.keyword) {
+        const keyword = p.keyword.toLowerCase();
+        all = all.filter((v) => {
+          return (
+            v.id.toString().includes(keyword) ||
+            formatStorage(v.storage).toLowerCase().includes(keyword) ||
+            v.questionCount.toString().includes(keyword)
+          );
+        });
+      }
+
+      // 高级搜索：创建日期范围
+      if (p.createdAt && Array.isArray(p.createdAt) && p.createdAt.length === 2) {
+        const [start, end] = p.createdAt;
+        if (start && end) {
+          const startDate = new Date(start);
+          const endDate = new Date(end);
+          endDate.setHours(23, 59, 59, 999); // 包含结束日期当天
+          all = all.filter((v) => {
+            const date = new Date(v.createdAt);
+            return date >= startDate && date <= endDate;
+          });
+        }
+      }
+
+      // 高级搜索：占用空间
+      if (p.storage) {
+        const storageStr = p.storage.toLowerCase();
+        all = all.filter((v) =>
+          formatStorage(v.storage).toLowerCase().includes(storageStr)
+        );
+      }
+
+      // 高级搜索：题目数量
+      if (p.questionCount) {
+        all = all.filter((v) =>
+          v.questionCount.toString().includes(p.questionCount!)
+        );
+      }
+
       const offset = (p.page - 1) * p.pageSize;
       resolve({
         list: all.slice(offset, offset + p.pageSize),

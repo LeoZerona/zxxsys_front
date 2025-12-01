@@ -21,8 +21,8 @@
     </div>
   </div>
 </template>
-  
-  <script setup lang="ts">
+
+<script setup lang="ts">
 import { useRouter } from "vue-router";
 
 interface Props {
@@ -49,8 +49,8 @@ const goBack = () => {
   router.back();
 };
 </script>
-  
-  <style scoped>
+
+<style scoped>
 .error-404 {
   display: flex;
   justify-content: center;
