@@ -17,31 +17,16 @@
         <div class="header-top">
           <el-breadcrumb separator="/" class="breadcrumb">
             <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
-            <el-breadcrumb-item>{{ currentPageTitle }}</el-breadcrumb-item>
+            <el-breadcrumb-item
+              v-for="(item, index) in breadcrumbList"
+              :key="index"
+              :to="item.path ? { name: item.path } : undefined"
+            >
+              {{ item.title }}
+            </el-breadcrumb-item>
           </el-breadcrumb>
 
-          <div class="user-info">
-            <el-dropdown>
-              <span class="el-dropdown-link">
-                <el-avatar :size="32" :src="userInfo.avatar" />
-                管理员
-                <el-icon class="el-icon--right"><ArrowDown /></el-icon>
-              </span>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="profile">
-                    <el-icon><User /></el-icon>个人中心
-                  </el-dropdown-item>
-                  <el-dropdown-item command="password">
-                    <el-icon><Lock /></el-icon>修改密码
-                  </el-dropdown-item>
-                  <el-dropdown-item command="logout" divided>
-                    <el-icon><SwitchButton /></el-icon>退出登录
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-          </div>
+          <UserInfo @command="handleUserCommand" />
         </div>
 
         <!-- 标签栏 -->
@@ -64,19 +49,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onMounted, nextTick } from "vue";
+import { ref, watch, onMounted, nextTick } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import rightMenu from "./components/leftMenu/index.vue";
 // import rightMenu from "./components/rightMenu.vue";
 import type { MenuItem } from "./components/leftMenu/components/RecurseMenu.vue";
 import TabsBar from "./components/TabsBar.vue";
+import UserInfo from "./components/UserInfo.vue";
 import type { ContextMenuType } from "@/components/contextMenu/index.vue";
 
 /* ---------------- 数据 ---------------- */
-const userInfo = ref({
-  name: "管理员",
-  avatar: "https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png",
-});
 const isCollapse = ref(false);
 const activeMenu = ref<string>("originalQuestionBank");
 
@@ -119,10 +101,89 @@ const menuList = ref<ContextMenuType[]>([
   { key: "closeAll", label: "关闭所有", disabled: false, divided: true },
 ]);
 
+// 面包屑列表
+interface BreadcrumbItem {
+  name: string;
+  title: string;
+  path?: string;
+}
+const breadcrumbList = ref<BreadcrumbItem[]>([]);
+
 /* ---------------- 计算属性 ---------------- */
-const currentPageTitle = computed(
-  () => menuTitleMap[activeMenu.value] ?? "用户列表"
-);
+
+// 查找菜单项及其父级菜单
+function findMenuPath(
+  menuList: MenuItem[],
+  targetName: string,
+  path: MenuItem[] = []
+): MenuItem[] | null {
+  for (const item of menuList) {
+    const currentPath = [...path, item];
+
+    // 如果找到目标菜单项
+    if (item.name === targetName) {
+      return currentPath;
+    }
+
+    // 如果有子菜单，递归查找
+    if (item.children && item.children.length > 0) {
+      const found = findMenuPath(item.children, targetName, currentPath);
+      if (found) {
+        return found;
+      }
+    }
+  }
+  return null;
+}
+
+// 生成面包屑列表
+function generateBreadcrumb() {
+  const routeName = route.name as string;
+
+  // 处理详情页路由
+  if (
+    routeName === "questionBankDetail" ||
+    routeName === "questionTypeDetail"
+  ) {
+    // 详情页的面包屑：首页 / 题库管理 / 原题库 / 当前页面
+    const menuPath = findMenuPath(customMenu, "originalQuestionBank");
+    if (menuPath) {
+      breadcrumbList.value = menuPath.map((item) => ({
+        name: item.name,
+        title: item.title,
+        path: item.children && item.children.length > 0 ? undefined : item.name,
+      }));
+    }
+    // 添加当前详情页
+    const currentTitle = menuTitleMap[routeName] || "详情";
+    breadcrumbList.value.push({
+      name: routeName,
+      title: currentTitle,
+      path: undefined, // 详情页不可点击
+    });
+    return;
+  }
+
+  // 处理普通路由
+  const menuPath = findMenuPath(customMenu, routeName);
+  if (menuPath) {
+    breadcrumbList.value = menuPath.map((item) => ({
+      name: item.name,
+      title: item.title,
+      // 只有叶子节点（没有子菜单的）才可点击
+      path: item.children && item.children.length > 0 ? undefined : item.name,
+    }));
+  } else {
+    // 如果找不到菜单项，只显示当前页面标题
+    breadcrumbList.value = [
+      {
+        name: routeName,
+        title: menuTitleMap[routeName] || "未知页面",
+        path: undefined,
+      },
+    ];
+  }
+}
 
 /* ---------------- 方法 ---------------- */
 const router = useRouter();
@@ -132,6 +193,24 @@ function handleMenuSelect(name: string) {
   activeMenu.value = name;
   addTab(name);
   router.push({ name });
+}
+
+// 处理用户信息下拉菜单命令
+function handleUserCommand(command: "profile" | "password" | "logout") {
+  switch (command) {
+    case "profile":
+      // TODO: 跳转到个人中心页面
+      console.log("跳转到个人中心");
+      break;
+    case "password":
+      // TODO: 打开修改密码对话框
+      console.log("打开修改密码对话框");
+      break;
+    case "logout":
+      // TODO: 退出登录逻辑
+      console.log("退出登录");
+      break;
+  }
 }
 /* 标签页相关方法 */
 const addTab = async (name: string) => {
@@ -157,7 +236,9 @@ const closeTab = (name: string) => {
         const bankId = nextTab.name.replace("questionBankDetail-", "");
         router.push({ name: "questionBankDetail", params: { id: bankId } });
       } else if (nextTab.name.startsWith("questionTypeDetail-")) {
-        const parts = nextTab.name.replace("questionTypeDetail-", "").split("-");
+        const parts = nextTab.name
+          .replace("questionTypeDetail-", "")
+          .split("-");
         const bankId = parts[0];
         const type = parts[1];
         router.push({
@@ -176,7 +257,7 @@ const closeTab = (name: string) => {
 const handleTabClick = (tab: { name: string; title: string }) => {
   const name = tab.name;
   activeTab.value = name; // 更新激活标签
-  
+
   // 处理详情页标签
   if (name.startsWith("questionBankDetail-")) {
     const bankId = name.replace("questionBankDetail-", "");
@@ -202,8 +283,10 @@ const onMenuClick = (key: string, tab?: { name: string; title: string }) => {
   const currentTabName = tab?.name || activeTab.value;
   const currentTabTitle = tab?.title || menuTitleMap[currentTabName] || "";
   const currentTab = { name: currentTabName, title: currentTabTitle };
-  const currentIndex = visitedTabs.value.findIndex((t) => t.name === currentTab.name);
-  
+  const currentIndex = visitedTabs.value.findIndex(
+    (t) => t.name === currentTab.name
+  );
+
   switch (key) {
     case "closeOther":
       // 关闭其他标签，只保留当前标签
@@ -235,6 +318,9 @@ const isInitialized = ref(false);
 watch(
   () => route.name as string,
   (name) => {
+    // 更新面包屑
+    generateBreadcrumb();
+
     // 处理详情页路由
     if (name === "questionBankDetail") {
       if (isInitialized.value) {
@@ -301,6 +387,9 @@ watch(
 
 /* 初始化：进入系统时自动进入原题库 */
 onMounted(() => {
+  // 初始化面包屑
+  generateBreadcrumb();
+
   // 如果是详情页，直接处理
   if (route.name === "questionBankDetail") {
     const bankId = route.params.id as string;
@@ -342,7 +431,11 @@ onMounted(() => {
   }
 
   // 如果当前路由不在菜单中，或者路由不是原题库，则跳转到原题库
-  if (!route.name || !menuTitleMap[route.name as string] || route.name !== "originalQuestionBank") {
+  if (
+    !route.name ||
+    !menuTitleMap[route.name as string] ||
+    route.name !== "originalQuestionBank"
+  ) {
     router.push({ name: "originalQuestionBank" }).then(() => {
       // 跳转完成后，添加原题库标签并标记初始化完成
       addTab("originalQuestionBank");
@@ -388,18 +481,6 @@ onMounted(() => {
     .breadcrumb {
       font-size: 14px;
       color: #606266;
-    }
-    .user-info {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      .el-dropdown-link {
-        cursor: pointer;
-        color: #409eff;
-        display: flex;
-        align-items: center;
-        gap: 5px;
-      }
     }
   }
 }

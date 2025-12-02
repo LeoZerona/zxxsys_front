@@ -240,6 +240,7 @@ import {
 } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
+import CryptoJS from "crypto-js";
 
 // 路由相关
 const route = useRoute();
@@ -472,7 +473,22 @@ const handleUpdatePassword = async () => {
   await passwordFormRef.value.validate((valid) => {
     if (valid) {
       passwordLoading.value = true;
+      
+      // 对原密码和新密码进行MD5加密
+      const encryptedOldPassword = CryptoJS.MD5(passwordForm.value.oldPassword).toString();
+      const encryptedNewPassword = CryptoJS.MD5(passwordForm.value.newPassword).toString();
+      
+      // TODO: 调用修改密码API
+      // await api.updatePassword({
+      //   oldPassword: encryptedOldPassword, // 加密后的原密码
+      //   newPassword: encryptedNewPassword, // 加密后的新密码
+      // });
+      
       setTimeout(() => {
+        console.log("[Update Password]", {
+          oldPassword: encryptedOldPassword, // 加密后的原密码
+          newPassword: encryptedNewPassword, // 加密后的新密码
+        });
         ElMessage.success("密码修改成功，请重新登录");
         passwordDialogVisible.value = false;
         resetPasswordForm();

@@ -149,19 +149,33 @@ handleSearch();
     color: #bfcbd9;
 
     .responsive-input {
-      transform: scaleX(1);
       transform-origin: left center;
-      transition: max-width 0.3s ease, opacity 0.2s ease 0.05s,
-        transform 0.3s ease;
+      overflow: hidden;
+      flex-shrink: 0;
+      transition: width 0.3s ease, opacity 0.3s ease, padding 0.3s ease, margin 0.3s ease;
+      
+      :deep(.el-input__wrapper) {
+        transition: width 0.3s ease;
+      }
     }
     .shrink-input {
-      max-width: 0;
+      width: 0 !important;
       opacity: 0;
       padding: 0;
+      margin: 0;
+      min-width: 0;
+      
+      :deep(.el-input__wrapper) {
+        width: 0;
+      }
     }
     .expand-input {
-      width: 144px;
+      width: 144px !important;
       opacity: 1;
+      
+      :deep(.el-input__wrapper) {
+        width: 100%;
+      }
     }
     .icon {
       margin-left: 10px;

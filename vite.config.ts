@@ -26,4 +26,16 @@ export default defineConfig({
       "@": resolve(__dirname, "src"),
     },
   },
+  // 开发服务器配置
+  server: {
+    proxy: {
+      // 代理所有以 /api 开头的请求
+      '/api': {
+        target: 'http://192.168.0.101:5000', // 后端服务地址
+        changeOrigin: true, // 改变请求头中的 origin
+        secure: false, // 如果是 https 接口，需要配置这个参数
+        // rewrite: (path) => path.replace(/^\/api/, ''), // 如果后端接口没有 /api 前缀，可以去掉这行
+      },
+    },
+  },
 });

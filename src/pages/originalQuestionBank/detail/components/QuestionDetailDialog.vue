@@ -32,32 +32,65 @@
 
       <!-- 题目内容 -->
       <div class="detail-section">
-        <h4>题目内容</h4>
+        <h4 v-if="question.questionType === 'fill'">题目内容（含填空位置）</h4>
+        <h4 v-else>题目内容</h4>
         <div class="content-box">{{ question.content }}</div>
       </div>
 
       <!-- 选择题选项 -->
-      <div v-if="question.options && question.options.length > 0" class="detail-section">
+      <div v-if="(question.questionType === 'single' || question.questionType === 'multiple') && question.options && question.options.length > 0" class="detail-section">
         <h4>选项</h4>
         <div class="options-list">
           <div
             v-for="(option, index) in question.options"
             :key="index"
             class="option-item"
+            :class="{ 'is-correct': isOptionCorrect(String.fromCharCode(65 + index)) }"
           >
             <span class="option-label">{{ String.fromCharCode(65 + index) }}.</span>
             <span class="option-content">{{ option }}</span>
+            <span v-if="isOptionCorrect(String.fromCharCode(65 + index))" class="correct-mark">✓ 正确答案</span>
           </div>
         </div>
       </div>
 
-      <!-- 正确答案 -->
+      <!-- 正确答案/参考答案 -->
       <div v-if="question.correctAnswer" class="detail-section">
-        <h4>正确答案</h4>
-        <div class="content-box answer-box">
-          {{ question.correctAnswer }}
+        <h4 v-if="question.questionType === 'essay'">参考答案</h4>
+        <h4 v-else-if="question.questionType === 'shortAnswer'">参考答案</h4>
+        <h4 v-else-if="question.questionType === 'fill'">填空答案</h4>
+        <h4 v-else-if="question.questionType === 'judge'">正确答案</h4>
+        <h4 v-else>正确答案</h4>
+        <div class="content-box answer-box" :class="{ 'judge-answer': question.questionType === 'judge' }">
+          <template v-if="question.questionType === 'judge'">
+            <span class="judge-answer-text">
+              {{ formatJudgeAnswer(question.correctAnswer) }}
+            </span>
+          </template>
+          <template v-else-if="question.questionType === 'single' || question.questionType === 'multiple'">
+            <span class="choice-answer-text">
+              正确答案：
+              <span class="answer-letters">
+                {{ formatChoiceAnswer(question.correctAnswer) }}
+              </span>
+            </span>
+            <div v-if="question.options" class="answer-options">
+              <div
+                v-for="(option, index) in question.options"
+                :key="index"
+                v-show="isOptionCorrect(String.fromCharCode(65 + index))"
+                class="answer-option-item"
+              >
+                {{ String.fromCharCode(65 + index) }}. {{ option }}
+              </div>
+            </div>
+          </template>
+          <template v-else>
+            {{ question.correctAnswer }}
+          </template>
         </div>
       </div>
+
 
       <!-- 题目解析 -->
       <div v-if="question.analysis" class="detail-section">
@@ -187,6 +220,39 @@ const formatSubject = (subject: string) => {
   };
   return subjectMap[subject] || subject;
 };
+
+// 判断选项是否为正确答案
+const isOptionCorrect = (optionLabel: string) => {
+  if (!props.question?.correctAnswer) return false;
+  // 处理多选题的多个答案（支持逗号、中文逗号、顿号、空格等分隔符）
+  const answers = props.question.correctAnswer
+    .split(/[,，、\s]+/)
+    .map(a => a.trim())
+    .filter(a => a);
+  return answers.includes(optionLabel);
+};
+
+// 格式化判断题答案
+const formatJudgeAnswer = (answer: string | undefined) => {
+  if (!answer) return "-";
+  const answerStr = String(answer).toLowerCase().trim();
+  if (answerStr === "true" || answerStr === "对" || answerStr === "正确" || answerStr === "1" || answerStr === "yes") {
+    return "对";
+  }
+  if (answerStr === "false" || answerStr === "错" || answerStr === "错误" || answerStr === "0" || answerStr === "no") {
+    return "错";
+  }
+  return answer;
+};
+
+// 格式化选择题答案（多选题用顿号分隔）
+const formatChoiceAnswer = (answer: string | undefined) => {
+  if (!answer) return "-";
+  // 处理多选题的多个答案，支持多种分隔符：逗号、中文逗号、顿号、空格
+  const answers = answer.split(/[,，、\s]+/).map(a => a.trim()).filter(a => a);
+  // 如果有多个答案，用顿号分隔；如果只有一个答案，也返回（可能是单选题）
+  return answers.length > 0 ? answers.join("、") : answer;
+};
 </script>
 
 <style scoped lang="scss">
@@ -215,15 +281,60 @@ const formatSubject = (subject: string) => {
       background: #f0f9ff;
       color: #1890ff;
       font-weight: 500;
+
+      &.judge-answer {
+        .judge-answer-text {
+          font-size: 18px;
+          font-weight: 600;
+          color: #409eff;
+        }
+      }
+
+      .choice-answer-text {
+        font-size: 16px;
+        font-weight: 500;
+        color: #409eff;
+        margin-bottom: 12px;
+        display: block;
+
+        .answer-letters {
+          font-size: 18px;
+          font-weight: 600;
+          color: #67c23a;
+        }
+      }
+
+      .answer-options {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid #e4e7ed;
+
+        .answer-option-item {
+          padding: 8px 12px;
+          margin-bottom: 8px;
+          background: #f0f9ff;
+          border-left: 3px solid #409eff;
+          color: #409eff;
+          font-weight: 500;
+          border-radius: 4px;
+        }
+      }
     }
 
     .options-list {
       .option-item {
         display: flex;
+        align-items: center;
         padding: 8px 12px;
         margin-bottom: 8px;
         background: #f5f7fa;
         border-radius: 4px;
+        transition: all 0.3s;
+
+        &.is-correct {
+          background: #f0f9ff;
+          border: 1px solid #409eff;
+        }
 
         .option-label {
           font-weight: 500;
@@ -235,6 +346,18 @@ const formatSubject = (subject: string) => {
         .option-content {
           flex: 1;
           color: #606266;
+        }
+
+        &.is-correct .option-content {
+          color: #409eff;
+          font-weight: 500;
+        }
+
+        .correct-mark {
+          margin-left: auto;
+          color: #67c23a;
+          font-weight: 500;
+          font-size: 12px;
         }
       }
     }

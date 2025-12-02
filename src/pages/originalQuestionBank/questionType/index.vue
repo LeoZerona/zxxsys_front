@@ -7,9 +7,28 @@
         <el-breadcrumb-item :to="{ name: 'questionBankDetail', params: { id: bankId } }">
           题库内容
         </el-breadcrumb-item>
-        <el-breadcrumb-item>{{ typeName }}</el-breadcrumb-item>
+        <el-breadcrumb-item>题目类型</el-breadcrumb-item>
       </el-breadcrumb>
       <el-button :icon="ArrowLeft" @click="handleBack">返回</el-button>
+    </div>
+
+    <!-- 题目类型快速切换 -->
+    <div class="type-filter-bar">
+      <div class="type-label">切换类型：</div>
+      <div class="type-buttons">
+        <el-button
+          v-for="type in questionTypes"
+          :key="type.value"
+          :type="questionType === type.value ? 'primary' : 'default'"
+          size="small"
+          @click="handleTypeSwitch(type.value)"
+        >
+          {{ type.label }}
+        </el-button>
+      </div>
+      <div class="current-type">
+        当前查看：<span class="current-type-name">{{ typeName }}</span>
+      </div>
     </div>
 
     <!-- 工具栏 -->
@@ -176,6 +195,16 @@ const typeNameMap: Record<string, string> = {
 
 const typeName = computed(() => typeNameMap[questionType.value] || questionType.value);
 
+// 题目类型列表（用于切换）
+const questionTypes = [
+  { label: "单选题", value: "single" },
+  { label: "多选题", value: "multiple" },
+  { label: "填空题", value: "fill" },
+  { label: "简答题", value: "shortAnswer" },
+  { label: "判断题", value: "judge" },
+  { label: "论述题", value: "essay" },
+];
+
 /* ===================== 工具函数 ===================== */
 const formatDate = (d: string | Date) => {
   const date = new Date(d);
@@ -234,6 +263,21 @@ function handleBack() {
   router.push({ name: "questionBankDetail", params: { id: bankId.value } });
 }
 
+// 切换题目类型
+function handleTypeSwitch(type: string) {
+  if (type === questionType.value) {
+    return; // 如果点击的是当前类型，不执行任何操作
+  }
+  // 跳转到新的题目类型页面
+  router.push({
+    name: "questionTypeDetail",
+    params: {
+      bankId: bankId.value,
+      type: type,
+    },
+  });
+}
+
 function handleDetailClose() {
   showDetailDialog.value = false;
   currentQuestion.value = null;
@@ -278,21 +322,24 @@ const columns = computed<Column[]>(() => {
     },
     {
       prop: "content",
-      label: "题目内容",
+      label: questionType.value === "fill" ? "题目内容（含填空）" : "题目内容",
       minWidth: 300,
       align: "left",
       searchType: "input",
       formatter: (val) => {
-        if (typeof val === "string" && val.length > 100) {
-          return val.substring(0, 100) + "...";
+        // 填空题可能需要显示更长的内容
+        const maxLength = questionType.value === "fill" ? 150 : 100;
+        if (typeof val === "string" && val.length > maxLength) {
+          return val.substring(0, maxLength) + "...";
         }
         return val;
       },
     },
   ];
 
-  // 选择题特有字段：选项
+  // 根据题目类型添加特定字段
   if (questionType.value === "single" || questionType.value === "multiple") {
+    // 选择题：显示选项和正确答案
     baseColumns.push({
       prop: "options",
       label: "选项",
@@ -300,6 +347,7 @@ const columns = computed<Column[]>(() => {
       align: "left",
       formatter: (_val, row) => {
         if (row.options && row.options.length > 0) {
+          // 选项横向一排显示，用分隔符连接
           return row.options
             .map((opt, idx) => `${String.fromCharCode(65 + idx)}. ${opt}`)
             .join(" | ");
@@ -310,19 +358,65 @@ const columns = computed<Column[]>(() => {
     baseColumns.push({
       prop: "correctAnswer",
       label: "正确答案",
-      width: 120,
-      formatter: (val) => val || "-",
+      width: 180,
+      formatter: (val, row) => {
+        if (!val) return "-";
+        // 多选题：显示多个答案，用顿号分隔
+        if (row.questionType === "multiple") {
+          // 支持多种分隔符：逗号、中文逗号、顿号、空格
+          const answers = val.split(/[,，、\s]+/).map(v => v.trim()).filter(v => v);
+          if (answers.length > 0) {
+            return answers.join("、");
+          }
+          return val;
+        }
+        // 单选题：显示单个选项字母
+        return val;
+      },
     });
-  } else {
-    // 其他类型显示正确答案
+  } else if (questionType.value === "fill") {
+    // 填空题：显示填空答案（题目内容已在baseColumns中）
+    baseColumns.push({
+      prop: "correctAnswer",
+      label: "填空答案",
+      minWidth: 250,
+      align: "left",
+      formatter: (val) => {
+        if (typeof val === "string" && val.length > 80) {
+          return val.substring(0, 80) + "...";
+        }
+        return val || "-";
+      },
+    });
+  } else if (questionType.value === "judge") {
+    // 判断题：显示正确答案（对/错），明确显示
     baseColumns.push({
       prop: "correctAnswer",
       label: "正确答案",
-      minWidth: 200,
+      width: 120,
+      formatter: (val) => {
+        if (!val) return "-";
+        // 统一格式化为"对"或"错"
+        const answerStr = String(val).toLowerCase().trim();
+        if (answerStr === "true" || answerStr === "对" || answerStr === "正确" || answerStr === "1" || answerStr === "yes") {
+          return "对";
+        }
+        if (answerStr === "false" || answerStr === "错" || answerStr === "错误" || answerStr === "0" || answerStr === "no") {
+          return "错";
+        }
+        return val;
+      },
+    });
+  } else if (questionType.value === "shortAnswer" || questionType.value === "essay") {
+    // 简答题/论述题：显示参考答案
+    baseColumns.push({
+      prop: "correctAnswer",
+      label: "参考答案",
+      minWidth: 300,
       align: "left",
       formatter: (val) => {
-        if (typeof val === "string" && val.length > 50) {
-          return val.substring(0, 50) + "...";
+        if (typeof val === "string" && val.length > 100) {
+          return val.substring(0, 100) + "...";
         }
         return val || "-";
       },
@@ -644,6 +738,41 @@ onMounted(() => {
   }
 }
 
+.type-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #e4e7ed;
+  flex-wrap: wrap;
+
+  .type-label {
+    font-size: 14px;
+    color: #606266;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .type-buttons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    flex: 1;
+  }
+
+  .current-type {
+    font-size: 14px;
+    color: #909399;
+    white-space: nowrap;
+    margin-left: auto;
+
+    .current-type-name {
+      color: #409eff;
+      font-weight: 500;
+    }
+  }
+}
+
 .data-table {
   flex: 1;
   border: 1px solid #ebeef5;
@@ -662,5 +791,6 @@ onMounted(() => {
   justify-content: flex-end;
   padding: 8px 0;
 }
+
 </style>
 

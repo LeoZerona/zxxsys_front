@@ -243,19 +243,9 @@ function handleEdit(row: QuestionItem) {
 
 function handleTypeFilter(type: string) {
   selectedType.value = type;
-  if (type) {
-    // 跳转到题目类型专门页面
-    router.push({
-      name: "questionTypeDetail",
-      params: {
-        bankId: bankId.value,
-        type: type,
-      },
-    });
-  } else {
-    // 如果选择"全部"，保持在当前页面，但清除类型筛选
-    // 这里可以添加清除筛选的逻辑
-  }
+  // 更新筛选条件并重新获取数据
+  page.value = 1;
+  fetchData();
 }
 
 function handleDel(row: QuestionItem) {
@@ -284,104 +274,233 @@ function handleEditSave() {
   fetchData(); // 刷新列表
 }
 
-/* ===================== 列配置 ===================== */
-const columns = ref<Column[]>([
-  {
-    prop: "questionId",
-    label: "题目编号",
-    width: 100,
-  },
-  {
-    prop: "subject",
-    label: "科目",
-    width: 120,
-    searchType: "select",
-    options: [
-      { label: "数学", value: "math" },
-      { label: "语文", value: "chinese" },
-      { label: "英语", value: "english" },
-      { label: "物理", value: "physics" },
-      { label: "化学", value: "chemistry" },
-      { label: "生物", value: "biology" },
-      { label: "历史", value: "history" },
-      { label: "地理", value: "geography" },
-      { label: "政治", value: "politics" },
-    ],
-    formatter: (val) => formatSubject(val),
-  },
-  {
-    prop: "content",
-    label: "题目内容",
-    minWidth: 300,
-    align: "left",
-    searchType: "input",
-    formatter: (val) => {
-      // 限制显示长度，超出部分用省略号
-      if (typeof val === "string" && val.length > 100) {
-        return val.substring(0, 100) + "...";
-      }
-      return val;
+/* ===================== 列配置（根据题目类型动态调整） ===================== */
+const columns = computed<Column[]>(() => {
+  const baseColumns: Column[] = [
+    {
+      prop: "questionId",
+      label: "题目编号",
+      width: 100,
     },
-  },
-  {
-    prop: "questionType",
-    label: "题目类型",
-    width: 120,
-    searchType: "select",
-    options: [
-      { label: "单选题", value: "single" },
-      { label: "多选题", value: "multiple" },
-      { label: "填空题", value: "fill" },
-      { label: "简答题", value: "shortAnswer" },
-      { label: "判断题", value: "judge" },
-      { label: "论述题", value: "essay" },
-    ],
-    formatter: (val) => formatQuestionType(val),
-  },
-  {
-    prop: "difficulty",
-    label: "难度等级",
-    width: 100,
-    searchType: "select",
-    options: [
-      { label: "简单", value: "easy" },
-      { label: "中等", value: "medium" },
-      { label: "困难", value: "hard" },
-    ],
-    formatter: (val) => formatDifficulty(val),
-  },
-  {
-    prop: "score",
-    label: "分值",
-    width: 80,
-    searchType: "input",
-  },
-  {
-    prop: "createdAt",
-    label: "创建时间",
-    width: 180,
-    formatter: (val) => formatDate(val),
-    searchType: "dateRange",
-  },
-  {
-    prop: "updatedAt",
-    label: "更新时间",
-    width: 180,
-    formatter: (val) => formatDate(val),
-    searchType: "dateRange",
-  },
-  {
-    prop: "action",
-    label: "操作",
-    minWidth: 180,
-    fixed: "right",
-    actionButtons: [
-      { text: "查看详情", type: "primary", click: handleView },
-      { text: "编辑", type: "primary", click: handleEdit },
-      { text: "删除", type: "danger", click: handleDel },
-    ],
-  },
-]);
+    {
+      prop: "subject",
+      label: "科目",
+      width: 120,
+      searchType: "select",
+      options: [
+        { label: "数学", value: "math" },
+        { label: "语文", value: "chinese" },
+        { label: "英语", value: "english" },
+        { label: "物理", value: "physics" },
+        { label: "化学", value: "chemistry" },
+        { label: "生物", value: "biology" },
+        { label: "历史", value: "history" },
+        { label: "地理", value: "geography" },
+        { label: "政治", value: "politics" },
+      ],
+      formatter: (val) => formatSubject(val),
+    },
+    {
+      prop: "content",
+      label: selectedType.value === "fill" ? "题目内容（含填空）" : "题目内容",
+      minWidth: 300,
+      align: "left",
+      searchType: "input",
+      formatter: (val) => {
+        // 填空题可能需要显示更长的内容
+        const maxLength = selectedType.value === "fill" ? 150 : 100;
+        if (typeof val === "string" && val.length > maxLength) {
+          return val.substring(0, maxLength) + "...";
+        }
+        return val;
+      },
+    },
+  ];
+
+  // 如果选择了特定类型，不显示题目类型列；如果选择"全部"，显示题目类型列
+  if (!selectedType.value) {
+    baseColumns.push({
+      prop: "questionType",
+      label: "题目类型",
+      width: 120,
+      searchType: "select",
+      options: [
+        { label: "单选题", value: "single" },
+        { label: "多选题", value: "multiple" },
+        { label: "填空题", value: "fill" },
+        { label: "简答题", value: "shortAnswer" },
+        { label: "判断题", value: "judge" },
+        { label: "论述题", value: "essay" },
+      ],
+      formatter: (val) => formatQuestionType(val),
+    });
+  }
+
+  // 根据题目类型添加特定字段
+  if (selectedType.value === "single" || selectedType.value === "multiple") {
+    // 选择题：显示选项和正确答案
+    baseColumns.push({
+      prop: "options",
+      label: "选项",
+      minWidth: 400,
+      align: "left",
+      formatter: (_val, row) => {
+        if (row.options && row.options.length > 0) {
+          // 选项横向一排显示，用分隔符连接
+          return row.options
+            .map((opt, idx) => `${String.fromCharCode(65 + idx)}. ${opt}`)
+            .join(" | ");
+        }
+        return "-";
+      },
+    });
+    baseColumns.push({
+      prop: "correctAnswer",
+      label: "正确答案",
+      width: 180,
+      formatter: (val, row) => {
+        if (!val) return "-";
+        // 多选题：显示多个答案，用顿号分隔
+        if (row.questionType === "multiple") {
+          // 支持多种分隔符：逗号、中文逗号、顿号、空格
+          const answers = val.split(/[,，、\s]+/).map(v => v.trim()).filter(v => v);
+          if (answers.length > 0) {
+            return answers.join("、");
+          }
+          return val;
+        }
+        // 单选题：显示单个选项字母
+        return val;
+      },
+    });
+  } else if (selectedType.value === "fill") {
+    // 填空题：显示填空答案（题目内容已在baseColumns中）
+    baseColumns.push({
+      prop: "correctAnswer",
+      label: "填空答案",
+      minWidth: 250,
+      align: "left",
+      formatter: (val) => {
+        if (typeof val === "string" && val.length > 80) {
+          return val.substring(0, 80) + "...";
+        }
+        return val || "-";
+      },
+    });
+  } else if (selectedType.value === "judge") {
+    // 判断题：显示正确答案（对/错），明确显示
+    baseColumns.push({
+      prop: "correctAnswer",
+      label: "正确答案",
+      width: 120,
+      formatter: (val) => {
+        if (!val) return "-";
+        // 统一格式化为"对"或"错"
+        const answerStr = String(val).toLowerCase().trim();
+        if (answerStr === "true" || answerStr === "对" || answerStr === "正确" || answerStr === "1" || answerStr === "yes") {
+          return "对";
+        }
+        if (answerStr === "false" || answerStr === "错" || answerStr === "错误" || answerStr === "0" || answerStr === "no") {
+          return "错";
+        }
+        return val;
+      },
+    });
+  } else if (selectedType.value === "shortAnswer" || selectedType.value === "essay") {
+    // 简答题/论述题：显示参考答案
+    baseColumns.push({
+      prop: "correctAnswer",
+      label: "参考答案",
+      minWidth: 300,
+      align: "left",
+      formatter: (val) => {
+        if (typeof val === "string" && val.length > 100) {
+          return val.substring(0, 100) + "...";
+        }
+        return val || "-";
+      },
+    });
+  } else if (!selectedType.value) {
+    // 如果选择"全部"，根据每行的题目类型动态显示答案列
+    // 这里简化处理，显示一个通用的答案列
+    baseColumns.push({
+      prop: "correctAnswer",
+      label: "正确答案/参考答案",
+      minWidth: 200,
+      align: "left",
+      formatter: (val, row) => {
+        if (!val) return "-";
+        // 根据题目类型格式化答案
+        if (row.questionType === "judge") {
+          const answerStr = String(val).toLowerCase().trim();
+          if (answerStr === "true" || answerStr === "对" || answerStr === "正确" || answerStr === "1" || answerStr === "yes") {
+            return "对";
+          }
+          if (answerStr === "false" || answerStr === "错" || answerStr === "错误" || answerStr === "0" || answerStr === "no") {
+            return "错";
+          }
+        } else if (row.questionType === "multiple") {
+          const answers = val.split(/[,，、\s]+/).map(v => v.trim()).filter(v => v);
+          if (answers.length > 0) {
+            return answers.join("、");
+          }
+        }
+        if (typeof val === "string" && val.length > 80) {
+          return val.substring(0, 80) + "...";
+        }
+        return val;
+      },
+    });
+  }
+
+  baseColumns.push(
+    {
+      prop: "difficulty",
+      label: "难度等级",
+      width: 100,
+      searchType: "select",
+      options: [
+        { label: "简单", value: "easy" },
+        { label: "中等", value: "medium" },
+        { label: "困难", value: "hard" },
+      ],
+      formatter: (val) => formatDifficulty(val),
+    },
+    {
+      prop: "score",
+      label: "分值",
+      width: 80,
+      searchType: "input",
+    },
+    {
+      prop: "createdAt",
+      label: "创建时间",
+      width: 180,
+      formatter: (val) => formatDate(val),
+      searchType: "dateRange",
+    },
+    {
+      prop: "updatedAt",
+      label: "更新时间",
+      width: 180,
+      formatter: (val) => formatDate(val),
+      searchType: "dateRange",
+    },
+    {
+      prop: "action",
+      label: "操作",
+      minWidth: 180,
+      fixed: "right",
+      actionButtons: [
+        { text: "查看详情", type: "primary", click: handleView },
+        { text: "编辑", type: "primary", click: handleEdit },
+        { text: "删除", type: "danger", click: handleDel },
+      ],
+    }
+  );
+
+  return baseColumns;
+});
 
 // 题目类型选项
 const questionTypes = [
@@ -491,6 +610,7 @@ function onColumnChange(cols: string[]) {
 function handleReset() {
   searchKeyword.value = "";
   advSearchParams.value = {};
+  selectedType.value = ""; // 重置题目类型筛选
   page.value = 1;
   fetchData();
 }
@@ -509,6 +629,7 @@ async function fetchData() {
       page: page.value,
       pageSize: pageSize.value,
       keyword: searchKeyword.value,
+      questionType: selectedType.value || undefined, // 如果选择了类型，传递筛选条件
       ...advSearchParams.value,
     });
     tableData.value = res.list;
