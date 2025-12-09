@@ -58,6 +58,15 @@ export async function register(
   }
 }
 
+// 验证码响应类型
+export interface CaptchaResponse extends ApiResponse {
+  data?: {
+    captcha_code: string
+    session_key: string
+    expires_in: number
+  }
+}
+
 // 登录响应类型
 export interface LoginResponse extends ApiResponse {
   data?: {
@@ -73,6 +82,9 @@ export interface LoginResponse extends ApiResponse {
     token_type: string
     expires_in: number
   }
+  code?: string // 错误代码
+  requires_captcha?: boolean // 是否需要验证码
+  attempt_count?: number // 失败次数
 }
 
 // 刷新 Token 响应类型
@@ -84,16 +96,37 @@ export interface RefreshTokenResponse extends ApiResponse {
   }
 }
 
+// 获取验证码
+export async function getCaptcha(): Promise<CaptchaResponse> {
+  try {
+    const response = await request.get<CaptchaResponse>('/captcha')
+    return response
+  } catch (error: any) {
+    // 错误已经在拦截器中处理，这里直接抛出
+    throw error
+  }
+}
+
 // 用户登录
 export async function login(
   email: string,
-  password: string
+  password: string,
+  captchaSessionKey?: string,
+  captchaCode?: string
 ): Promise<LoginResponse> {
   try {
-    const response = await request.post<LoginResponse>('/login', {
+    const requestData: any = {
       email,
       password,
-    })
+    }
+    
+    // 如果需要验证码，添加验证码参数
+    if (captchaSessionKey && captchaCode) {
+      requestData.captcha_session_key = captchaSessionKey
+      requestData.captcha_code = captchaCode
+    }
+    
+    const response = await request.post<LoginResponse>('/login', requestData)
     return response
   } catch (error: any) {
     // 错误已经在拦截器中处理，这里直接抛出

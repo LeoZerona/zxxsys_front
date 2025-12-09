@@ -3,23 +3,33 @@ import type { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosErr
 import { ElMessage } from 'element-plus'
 
 // API 基础配置
-// 开发环境使用代理（通过 vite.config.ts 配置），生产环境使用完整 URL
-// 优先使用环境变量，如果没有则根据环境自动选择
+// 优先使用环境变量 VITE_API_BASE_URL
+// 如果没有配置，则根据环境自动选择：
+// - 开发环境：使用代理路径 '/api'
+// - 测试/生产环境：使用完整 URL
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
   (import.meta.env.DEV ? '/api' : 'http://192.168.0.101:5000/api')
+
+// 请求超时时间（从环境变量读取，默认 10 秒）
+const REQUEST_TIMEOUT = Number(import.meta.env.VITE_REQUEST_TIMEOUT) || 10000
 
 // 创建 axios 实例
 const request: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000, // 10秒超时
+  timeout: REQUEST_TIMEOUT,
   headers: {
     'Content-Type': 'application/json',
   },
 })
 
-// 开发环境下打印 API 基础地址，方便调试
-if (import.meta.env.DEV) {
+// 打印当前环境信息（仅在开发环境或调试模式开启时）
+if (import.meta.env.DEV || import.meta.env.VITE_DEBUG === 'true') {
+  console.log('=== 环境配置信息 ===')
+  console.log('环境模式:', import.meta.env.MODE)
+  console.log('应用环境:', import.meta.env.VITE_APP_ENV)
   console.log('API Base URL:', API_BASE_URL)
+  console.log('请求超时:', REQUEST_TIMEOUT + 'ms')
+  console.log('==================')
 }
 
 // Token 刷新标志，防止并发刷新
@@ -125,6 +135,17 @@ request.interceptors.response.use(
       // 如果 success 为 false，说明业务逻辑失败
       if (!data.success) {
         const message = data.message || '请求失败'
+        // 验证码相关错误不在这里显示消息，由业务代码处理
+        const captchaErrorCodes = ['REQUIRES_CAPTCHA', 'INVALID_CAPTCHA']
+        if (data.code && captchaErrorCodes.includes(data.code)) {
+          // 返回错误对象，包含完整信息，由业务代码处理
+          return Promise.reject({
+            message,
+            code: data.code,
+            requires_captcha: data.requires_captcha,
+            attempt_count: data.attempt_count,
+          })
+        }
         ElMessage.error(message)
         return Promise.reject(new Error(message))
       }
@@ -143,6 +164,12 @@ request.interceptors.response.use(
       // 根据状态码处理不同错误
       switch (status) {
         case 400:
+          // 验证码相关错误不在这里显示消息，由业务代码处理
+          const captchaErrorCodes = ['REQUIRES_CAPTCHA', 'INVALID_CAPTCHA']
+          if (data?.code && captchaErrorCodes.includes(data.code)) {
+            // 验证码相关错误，不显示通用错误消息，由业务代码处理
+            break
+          }
           ElMessage.error(data?.message || '请求参数错误')
           break
         case 401:
@@ -202,6 +229,8 @@ request.interceptors.response.use(
         data: data?.data,
         cooldown_seconds: data?.cooldown_seconds,
         code: data?.code,
+        requires_captcha: data?.requires_captcha,
+        attempt_count: data?.attempt_count,
       })
     } else if (error.request) {
       // 请求已发出但没有收到响应

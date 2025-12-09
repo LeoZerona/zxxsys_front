@@ -16,6 +16,13 @@ dist
 dist-ssr
 *.local
 
+# 环境配置文件（保留示例文件）
+.env
+.env.local
+.env.*.local
+# 注意：.env.development, .env.test, .env.production 可以根据需要决定是否提交
+# 如果包含敏感信息，建议不提交；如果只是配置示例，可以提交
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

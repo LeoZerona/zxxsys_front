@@ -126,26 +126,23 @@
           />
         </el-form-item>
 
-        <!-- 图形验证码（登录时显示） -->
-        <el-form-item v-if="!isRegister" prop="captcha">
+        <!-- 图形验证码（登录时显示，仅在需要验证码时显示输入框） -->
+        <el-form-item v-if="!isRegister && requiresCaptcha" prop="captcha">
           <div class="captcha-wrapper">
             <el-input
               v-model="form.captcha"
               placeholder="请输入验证码"
-              maxlength="6"
+              maxlength="4"
               clearable
             />
             <div class="captcha-box" @click="refreshCaptcha" title="看不清？点击刷新">
               <canvas
                 ref="captchaCanvasRef"
                 class="captcha-canvas"
-                width="160"
-                height="50"
+                width="120"
+                height="40"
               />
             </div>
-            <el-link type="primary" underline="false" class="captcha-refresh" @click.prevent="refreshCaptcha">
-              换一张
-            </el-link>
           </div>
           <!-- 开发环境：显示正确验证码 -->
           <div v-if="isDev && captchaText" class="dev-captcha-hint">
@@ -336,7 +333,7 @@ import { ElMessage, type FormInstance, type FormRules } from "element-plus";
 import { User, Lock, Message, InfoFilled, CircleCheck } from "@element-plus/icons-vue";
 import CryptoJS from "crypto-js";
 import { useRouter } from "vue-router";
-import { sendVerificationCode, register, login } from "@/api/auth";
+import { sendVerificationCode, register, login, getCaptcha } from "@/api/auth";
 import { useUserStore } from "@/stores/modules/user";
 import Captcha from "captcha-mini";
 
@@ -353,6 +350,8 @@ const sendingCode = ref(false); // 发送验证码中
 const codeCountdown = ref(0); // 验证码倒计时
 const captchaCanvasRef = ref<HTMLCanvasElement | null>(null); // 图形验证码画布
 const captchaText = ref(""); // 当前验证码文本
+const captchaSessionKey = ref(""); // 验证码会话键（从后端获取）
+const requiresCaptcha = ref(false); // 是否需要验证码
 
 // 忘记密码相关状态
 const resetPasswordFormRef = ref<FormInstance>();
@@ -418,7 +417,7 @@ const validateEmailCode = (_rule: any, value: string, callback: any) => {
 
 // 图形验证码校验
 const validateCaptcha = (_rule: any, value: string, callback: any) => {
-  if (isRegister.value) return callback();
+  if (isRegister.value || !requiresCaptcha.value) return callback();
   if (!value) {
     callback(new Error("请输入验证码"));
     return;
@@ -428,6 +427,7 @@ const validateCaptcha = (_rule: any, value: string, callback: any) => {
     callback(new Error("验证码加载中，请稍后重试"));
     return;
   }
+  // 验证码不区分大小写
   if (value.trim().toLowerCase() !== captchaText.value.toLowerCase()) {
     refreshCaptcha();
     callback(new Error("验证码错误，请重新输入"));
@@ -505,7 +505,20 @@ const rules = reactive<FormRules>({
     },
   ],
   emailCode: [{ validator: validateEmailCode, trigger: "blur" }],
-  captcha: [{ validator: validateCaptcha, trigger: "blur" }],
+  captcha: [
+    {
+      validator: (_rule: any, value: string, callback: any) => {
+        // 如果不需要验证码，直接通过
+        if (!requiresCaptcha.value) {
+          callback();
+          return;
+        }
+        // 如果需要验证码，调用验证函数
+        validateCaptcha(_rule, value, callback);
+      },
+      trigger: "blur",
+    },
+  ],
 });
 
 // 计算属性：邮箱是否有效
@@ -637,46 +650,176 @@ const handleResetCodeInput = (value: string) => {
 };
 
 /* -------------- 图形验证码 -------------- */
+// 从后端获取验证码
+const fetchCaptchaFromBackend = async () => {
+  try {
+    const response = await getCaptcha();
+    if (response.success && response.data) {
+      captchaText.value = response.data.captcha_code;
+      captchaSessionKey.value = response.data.session_key;
+      // 使用后端返回的验证码绘制图形
+      drawCaptchaWithText(captchaText.value);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error("获取验证码失败:", error);
+    // 如果后端获取失败，使用前端生成的验证码作为降级方案
+    drawCaptcha();
+    return false;
+  }
+};
+
+// 使用指定文本绘制验证码图形
+const drawCaptchaWithText = (text: string) => {
+  if (!captchaCanvasRef.value) return;
+  
+  const canvas = captchaCanvasRef.value;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  
+  // 配置验证码参数
+  const captcha = new Captcha({
+    fontSize: 22,
+    fontFamily: ['Arial', 'Helvetica', 'Georgia', '微软雅黑'],
+    lineWidth: 0.8,
+    lineNum: 3,
+    dotR: 1.5,
+    dotNum: 18,
+    preGroundColor: [30, 80],
+    backGroundColor: [220, 255],
+    fontStyle: 'fill',
+    length: text.length,
+  });
+  
+  // 清空画布
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // 绘制背景
+  const bgColors = captcha.getColor(captcha.backGroundColor);
+  ctx.fillStyle = `rgba(${bgColors[0]}, ${bgColors[1]}, ${bgColors[2]}, 0.8)`;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // 绘制干扰点
+  for (let i = 0; i < captcha.dotNum; i++) {
+    const x = captcha.getRandom(0, canvas.width);
+    const y = captcha.getRandom(0, canvas.height);
+    ctx.beginPath();
+    ctx.arc(x, y, captcha.dotR, 0, Math.PI * 2, false);
+    ctx.closePath();
+    const colors = captcha.getColor(captcha.preGroundColor);
+    ctx.fillStyle = `rgba(${colors[0]}, ${colors[1]}, ${colors[2]}, 0.6)`;
+    ctx.fill();
+  }
+  
+  // 绘制直线干扰线
+  for (let i = 0; i < captcha.lineNum; i++) {
+    const x = captcha.getRandom(0, canvas.width);
+    const y = captcha.getRandom(0, canvas.height);
+    const endX = captcha.getRandom(0, canvas.width);
+    const endY = captcha.getRandom(0, canvas.height);
+    ctx.beginPath();
+    ctx.lineWidth = captcha.lineWidth;
+    const colors = captcha.getColor(captcha.preGroundColor);
+    ctx.strokeStyle = `rgba(${colors[0]}, ${colors[1]}, ${colors[2]}, 0.6)`;
+    ctx.moveTo(x, y);
+    ctx.lineTo(endX, endY);
+    ctx.stroke();
+  }
+  
+  // 绘制曲线干扰线
+  for (let i = 0; i < 2; i++) {
+    const startX = captcha.getRandom(0, canvas.width);
+    const startY = captcha.getRandom(0, canvas.height);
+    const cp1X = captcha.getRandom(0, canvas.width);
+    const cp1Y = captcha.getRandom(0, canvas.height);
+    const cp2X = captcha.getRandom(0, canvas.width);
+    const cp2Y = captcha.getRandom(0, canvas.height);
+    const endX = captcha.getRandom(0, canvas.width);
+    const endY = captcha.getRandom(0, canvas.height);
+    
+    ctx.beginPath();
+    ctx.lineWidth = captcha.lineWidth * 0.8;
+    const colors = captcha.getColor(captcha.preGroundColor);
+    ctx.strokeStyle = `rgba(${colors[0]}, ${colors[1]}, ${colors[2]}, 0.5)`;
+    ctx.moveTo(startX, startY);
+    ctx.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, endX, endY);
+    ctx.stroke();
+  }
+  
+  // 绘制文字
+  ctx.font = `${captcha.fontSize}px ${captcha.fontFamily[captcha.getRandom(0, captcha.fontFamily.length)]}`;
+  ctx.textBaseline = 'middle';
+  
+  const totalWidth = canvas.width;
+  const charWidth = totalWidth / text.length;
+  const startOffset = 0.1;
+  const endOffset = 0.3;
+  
+  for (let i = 0; i < text.length; i++) {
+    const fontWidth = ctx.measureText(text[i]).width;
+    const x = captcha.getRandom(
+      charWidth * i + startOffset * fontWidth,
+      charWidth * i + endOffset * fontWidth
+    );
+    const deg = captcha.getRandom(-15, 15);
+    const colors = captcha.getColor(captcha.preGroundColor);
+    ctx.fillStyle = `rgba(${colors[0]}, ${colors[1]}, ${colors[2]}, 0.9)`;
+    ctx.save();
+    ctx.translate(x, canvas.height / 2);
+    ctx.rotate(deg * Math.PI / 180);
+    ctx.fillText(text[i], 0, 0);
+    ctx.restore();
+  }
+};
+
+// 前端生成验证码（降级方案）
 const drawCaptcha = async () => {
   await nextTick();
   if (!captchaCanvasRef.value) return;
   
-  // 配置验证码参数，提高清晰度
-  // captcha-mini 使用 canvas 的 width 和 height 属性来确定尺寸
-  // 配置参数参考：https://github.com/saucxs/captcha-mini
   const captcha = new Captcha({
-    fontSize: 28,       // 字体大小（增大以提高清晰度，默认20，适合50px高度）
-    fontFamily: ['Arial', 'Helvetica', 'Georgia', '微软雅黑'], // 字体类型
-    lineWidth: 0.5,    // 干扰线宽度（默认0.5）
-    lineNum: 1,        // 干扰线数量（减少干扰，默认2）
-    dotR: 1,          // 干扰点半径（默认1）
-    dotNum: 8,        // 干扰点数量（减少干扰，默认15）
-    preGroundColor: [30, 80],    // 前景色区间（深色，提高对比度，默认[10, 80]）
-    backGroundColor: [220, 255], // 背景色区间（浅色，提高对比度，默认[150, 250]）
-    fontStyle: 'fill', // 字体绘制方法（fill 或 stroke）
-    length: 4,        // 验证码长度（默认4）
+    fontSize: 22,
+    fontFamily: ['Arial', 'Helvetica', 'Georgia', '微软雅黑'],
+    lineWidth: 0.8,
+    lineNum: 3,
+    dotR: 1.5,
+    dotNum: 18,
+    preGroundColor: [30, 80],
+    backGroundColor: [220, 255],
+    fontStyle: 'fill',
+    length: 4,
   });
   
-  captcha.draw(captchaCanvasRef.value, (res: string) => {
-    captchaText.value = res;
-  });
+  const captchaTextValue = captcha.getText();
+  captchaText.value = captchaTextValue;
+  drawCaptchaWithText(captchaTextValue);
 };
 
-const refreshCaptcha = () => {
+const refreshCaptcha = async () => {
   form.captcha = "";
-  drawCaptcha();
+  // 如果需要验证码，从后端获取；否则使用前端生成
+  if (requiresCaptcha.value) {
+    await fetchCaptchaFromBackend();
+  } else {
+    drawCaptcha();
+  }
 };
 
 onMounted(() => {
   if (!isRegister.value) {
-    refreshCaptcha();
+    // 初始加载时不需要验证码，使用前端生成的验证码
+    drawCaptcha();
   }
 });
 
 watch(isRegister, (val) => {
   form.captcha = "";
+  requiresCaptcha.value = false;
+  captchaSessionKey.value = "";
   if (!val) {
-    refreshCaptcha();
+    // 切换到登录时，如果不需要验证码，使用前端生成的验证码
+    drawCaptcha();
   } else {
     captchaText.value = "";
   }
@@ -792,7 +935,11 @@ const handleSubmit = async () => {
       // 对密码进行MD5加密
       const encryptedPassword = CryptoJS.MD5(form.password).toString();
       
-      login(form.username, encryptedPassword)
+      // 如果需要验证码，传递验证码参数
+      const captchaKey = requiresCaptcha.value ? captchaSessionKey.value : undefined;
+      const captchaCode = requiresCaptcha.value ? form.captcha : undefined;
+      
+      login(form.username, encryptedPassword, captchaKey, captchaCode)
         .then((response) => {
           if (response.success && response.data) {
             const { user, access_token, refresh_token, expires_in } = response.data;
@@ -812,12 +959,32 @@ const handleSubmit = async () => {
             
             ElMessage.success(response.message || "登录成功");
             
+            // 登录成功后重置验证码状态
+            requiresCaptcha.value = false;
+            captchaSessionKey.value = "";
+            form.captcha = "";
+            
             // 跳转到首页或指定页面
             router.push({ name: "originalQuestionBank" });
           }
         })
-        .catch(() => {
-          // 错误信息已经在 request 拦截器中通过 ElMessage 显示
+        .catch((error: any) => {
+          // 检查是否需要验证码
+          if (error.code === 'REQUIRES_CAPTCHA' || error.requires_captcha) {
+            requiresCaptcha.value = true;
+            // 自动获取验证码
+            fetchCaptchaFromBackend().then((success) => {
+              if (success) {
+                ElMessage.warning("登录失败次数过多，请输入验证码");
+              }
+            });
+          } else if (error.code === 'INVALID_CAPTCHA') {
+            // 验证码错误，刷新验证码
+            if (requiresCaptcha.value) {
+              fetchCaptchaFromBackend();
+            }
+          }
+          // 其他错误信息已经在 request 拦截器中通过 ElMessage 显示
         })
         .finally(() => {
           loading.value = false;
@@ -1012,8 +1179,8 @@ $radius: 8px;
   gap: 8px;
 
   .captcha-box {
-    width: 160px;
-    height: 50px;
+    width: 120px;
+    height: 40px; // 匹配 Element Plus large 输入框高度
     border: 1px solid #e4e7ed;
     border-radius: 6px;
     overflow: hidden;
@@ -1032,18 +1199,13 @@ $radius: 8px;
   }
 
   .captcha-canvas {
-    width: 160px;
-    height: 50px;
+    width: 120px;
+    height: 40px; // 匹配 Element Plus large 输入框高度
     display: block;
     // 确保 canvas 清晰渲染
     image-rendering: auto;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-  }
-
-  .captcha-refresh {
-    white-space: nowrap;
-    font-size: 14px;
   }
 }
 

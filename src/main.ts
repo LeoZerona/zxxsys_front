@@ -10,6 +10,16 @@ import '@/styles/globalVariable.scss'
 import 'element-plus/dist/index.css';
 // import '@/styles/element-vars.scss';
 
+// 在开发环境或调试模式下显示环境信息
+if (import.meta.env.DEV || import.meta.env.VITE_DEBUG === 'true') {
+  console.log('%c=== 应用启动信息 ===', 'color: #409EFF; font-weight: bold;')
+  console.log('应用标题:', import.meta.env.VITE_APP_TITLE || '题库管理系统')
+  console.log('应用版本:', import.meta.env.VITE_APP_VERSION || '1.0.0')
+  console.log('环境模式:', import.meta.env.MODE)
+  console.log('应用环境:', import.meta.env.VITE_APP_ENV || import.meta.env.MODE)
+  console.log('==================', 'color: #409EFF; font-weight: bold;')
+}
+
 const app = createApp(App)
 
 app.use(pinia)
