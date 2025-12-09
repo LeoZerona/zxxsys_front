@@ -104,11 +104,11 @@
             </el-popover>
           </div>
           <!-- 开发环境：密码强度验证开关 -->
-          <div v-if="isRegister && isDev" class="dev-switch">
+          <div v-if="isDev" class="dev-switch">
             <el-switch
               v-model="enablePasswordValidation"
-              active-text="启用密码强度验证"
-              inactive-text="禁用密码强度验证"
+              :active-text="isRegister ? '启用密码强度验证' : '启用密码强度验证'"
+              :inactive-text="isRegister ? '禁用密码强度验证' : '禁用密码强度验证'"
               size="small"
             />
           </div>
@@ -124,6 +124,34 @@
             show-password
             clearable
           />
+        </el-form-item>
+
+        <!-- 图形验证码（登录时显示） -->
+        <el-form-item v-if="!isRegister" prop="captcha">
+          <div class="captcha-wrapper">
+            <el-input
+              v-model="form.captcha"
+              placeholder="请输入验证码"
+              maxlength="6"
+              clearable
+            />
+            <div class="captcha-box" @click="refreshCaptcha" title="看不清？点击刷新">
+              <canvas
+                ref="captchaCanvasRef"
+                class="captcha-canvas"
+                width="160"
+                height="50"
+              />
+            </div>
+            <el-link type="primary" underline="false" class="captcha-refresh" @click.prevent="refreshCaptcha">
+              换一张
+            </el-link>
+          </div>
+          <!-- 开发环境：显示正确验证码 -->
+          <div v-if="isDev && captchaText" class="dev-captcha-hint">
+            <span class="hint-label">开发环境验证码：</span>
+            <span class="hint-value">{{ captchaText }}</span>
+          </div>
         </el-form-item>
 
         <!-- 记住我 & 忘记密码 -->
@@ -303,11 +331,18 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, computed, onBeforeUnmount } from "vue";
+import { reactive, ref, computed, onBeforeUnmount, nextTick, watch, onMounted } from "vue";
 import { ElMessage, type FormInstance, type FormRules } from "element-plus";
 import { User, Lock, Message, InfoFilled, CircleCheck } from "@element-plus/icons-vue";
 import CryptoJS from "crypto-js";
-import { sendVerificationCode, register } from "@/api/auth";
+import { useRouter } from "vue-router";
+import { sendVerificationCode, register, login } from "@/api/auth";
+import { useUserStore } from "@/stores/modules/user";
+import Captcha from "captcha-mini";
+
+/* -------------- 路由和 Store -------------- */
+const router = useRouter();
+const userStore = useUserStore();
 
 /* -------------- 状态 -------------- */
 const isRegister = ref(false);
@@ -316,6 +351,8 @@ const loading = ref(false);
 const ruleFormRef = ref<FormInstance>();
 const sendingCode = ref(false); // 发送验证码中
 const codeCountdown = ref(0); // 验证码倒计时
+const captchaCanvasRef = ref<HTMLCanvasElement | null>(null); // 图形验证码画布
+const captchaText = ref(""); // 当前验证码文本
 
 // 忘记密码相关状态
 const resetPasswordFormRef = ref<FormInstance>();
@@ -326,8 +363,8 @@ const resetCodeCountdown = ref(0); // 重置密码验证码倒计时
 // 判断是否为开发环境
 const isDev = import.meta.env.DEV;
 
-// 密码强度验证开关（开发环境默认启用）
-const enablePasswordValidation = ref(isDev);
+// 密码强度验证开关（默认禁用）
+const enablePasswordValidation = ref(false);
 
 const form = reactive({
   username: isDev ? "123456789@qq.com" : "",
@@ -335,6 +372,7 @@ const form = reactive({
   remember: false,
   confirmPwd: isDev ? "123456" : "",
   emailCode: isDev ? "123456" : "", // 邮箱验证码
+  captcha: "", // 图形验证码输入
 });
 
 // 忘记密码表单
@@ -373,6 +411,26 @@ const validateEmailCode = (_rule: any, value: string, callback: any) => {
   }
   if (!/^\d{6}$/.test(value)) {
     callback(new Error("验证码为6位数字"));
+    return;
+  }
+  callback();
+};
+
+// 图形验证码校验
+const validateCaptcha = (_rule: any, value: string, callback: any) => {
+  if (isRegister.value) return callback();
+  if (!value) {
+    callback(new Error("请输入验证码"));
+    return;
+  }
+  if (!captchaText.value) {
+    refreshCaptcha();
+    callback(new Error("验证码加载中，请稍后重试"));
+    return;
+  }
+  if (value.trim().toLowerCase() !== captchaText.value.toLowerCase()) {
+    refreshCaptcha();
+    callback(new Error("验证码错误，请重新输入"));
     return;
   }
   callback();
@@ -447,6 +505,7 @@ const rules = reactive<FormRules>({
     },
   ],
   emailCode: [{ validator: validateEmailCode, trigger: "blur" }],
+  captcha: [{ validator: validateCaptcha, trigger: "blur" }],
 });
 
 // 计算属性：邮箱是否有效
@@ -577,6 +636,52 @@ const handleResetCodeInput = (value: string) => {
   resetPasswordForm.code = value.replace(/\D/g, "");
 };
 
+/* -------------- 图形验证码 -------------- */
+const drawCaptcha = async () => {
+  await nextTick();
+  if (!captchaCanvasRef.value) return;
+  
+  // 配置验证码参数，提高清晰度
+  // captcha-mini 使用 canvas 的 width 和 height 属性来确定尺寸
+  // 配置参数参考：https://github.com/saucxs/captcha-mini
+  const captcha = new Captcha({
+    fontSize: 28,       // 字体大小（增大以提高清晰度，默认20，适合50px高度）
+    fontFamily: ['Arial', 'Helvetica', 'Georgia', '微软雅黑'], // 字体类型
+    lineWidth: 0.5,    // 干扰线宽度（默认0.5）
+    lineNum: 1,        // 干扰线数量（减少干扰，默认2）
+    dotR: 1,          // 干扰点半径（默认1）
+    dotNum: 8,        // 干扰点数量（减少干扰，默认15）
+    preGroundColor: [30, 80],    // 前景色区间（深色，提高对比度，默认[10, 80]）
+    backGroundColor: [220, 255], // 背景色区间（浅色，提高对比度，默认[150, 250]）
+    fontStyle: 'fill', // 字体绘制方法（fill 或 stroke）
+    length: 4,        // 验证码长度（默认4）
+  });
+  
+  captcha.draw(captchaCanvasRef.value, (res: string) => {
+    captchaText.value = res;
+  });
+};
+
+const refreshCaptcha = () => {
+  form.captcha = "";
+  drawCaptcha();
+};
+
+onMounted(() => {
+  if (!isRegister.value) {
+    refreshCaptcha();
+  }
+});
+
+watch(isRegister, (val) => {
+  form.captcha = "";
+  if (!val) {
+    refreshCaptcha();
+  } else {
+    captchaText.value = "";
+  }
+});
+
 /* -------------- 发送邮箱验证码 -------------- */
 let countdownTimer: number | null = null;
 
@@ -683,22 +788,40 @@ const handleSubmit = async () => {
           loading.value = false;
         });
     } else {
-      // 登录逻辑（暂时保持原有逻辑，等待登录接口对接）
+      // 登录逻辑
       // 对密码进行MD5加密
       const encryptedPassword = CryptoJS.MD5(form.password).toString();
-
-      // TODO: 调用登录API
-      // await api.login({
-      //   username: form.username,
-      //   password: encryptedPassword, // 使用加密后的密码
-      //   remember: form.remember
-      // });
-      console.log("[Login]", {
-        username: form.username,
-        password: encryptedPassword, // 加密后的密码
-        remember: form.remember,
-      });
-      loading.value = false;
+      
+      login(form.username, encryptedPassword)
+        .then((response) => {
+          if (response.success && response.data) {
+            const { user, access_token, refresh_token, expires_in } = response.data;
+            
+            // 保存用户信息和 Token
+            userStore.setCurrentUser({
+              id: user.id,
+              email: user.email,
+              username: user.email.split('@')[0], // 从邮箱提取用户名
+              role: user.role,
+              roles: [user.role],
+              is_active: user.is_active,
+              avatar: '',
+              permissions: []
+            });
+            userStore.setToken(access_token, refresh_token, expires_in);
+            
+            ElMessage.success(response.message || "登录成功");
+            
+            // 跳转到首页或指定页面
+            router.push({ name: "originalQuestionBank" });
+          }
+        })
+        .catch(() => {
+          // 错误信息已经在 request 拦截器中通过 ElMessage 显示
+        })
+        .finally(() => {
+          loading.value = false;
+        });
     }
   });
 };
@@ -809,6 +932,10 @@ const switchOperation = () => {
   }
   codeCountdown.value = 0;
   sendingCode.value = false;
+  // 切回登录时刷新图形验证码
+  if (!isRegister.value) {
+    refreshCaptcha();
+  }
 };
 </script>
 
@@ -875,6 +1002,48 @@ $radius: 8px;
     flex-shrink: 0;
     white-space: nowrap;
     min-width: 120px;
+  }
+}
+
+/* 图形验证码 */
+.captcha-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .captcha-box {
+    width: 160px;
+    height: 50px;
+    border: 1px solid #e4e7ed;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #f8f9fa;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    flex-shrink: 0;
+
+    &:hover {
+      border-color: color.adjust($primary, $lightness: -10%);
+      box-shadow: 0 0 0 2px rgba($primary, 0.1);
+    }
+  }
+
+  .captcha-canvas {
+    width: 160px;
+    height: 50px;
+    display: block;
+    // 确保 canvas 清晰渲染
+    image-rendering: auto;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .captcha-refresh {
+    white-space: nowrap;
+    font-size: 14px;
   }
 }
 
@@ -955,6 +1124,33 @@ $radius: 8px;
   margin-top: 8px;
   font-size: 12px;
   color: #909399;
+}
+
+/* 开发环境验证码提示 */
+.dev-captcha-hint {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #0369a1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  .hint-label {
+    font-weight: 500;
+    color: #0284c7;
+  }
+
+  .hint-value {
+    font-weight: 600;
+    font-size: 14px;
+    color: #0c4a6e;
+    letter-spacing: 2px;
+    font-family: 'Courier New', monospace;
+  }
 }
 
 /* 统一文字按钮 */

@@ -7,6 +7,7 @@
         :active-menu="activeMenu"
         :menu-data="customMenu"
         @select="handleMenuSelect"
+        @toggle-collapse="isCollapse = !isCollapse"
       />
     </aside>
 
@@ -49,7 +50,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, nextTick } from "vue";
+import { ref, watch, onMounted, onBeforeUnmount, nextTick } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import rightMenu from "./components/leftMenu/index.vue";
 // import rightMenu from "./components/rightMenu.vue";
@@ -61,6 +62,29 @@ import type { ContextMenuType } from "@/components/contextMenu/index.vue";
 /* ---------------- 数据 ---------------- */
 const isCollapse = ref(false);
 const activeMenu = ref<string>("originalQuestionBank");
+
+// 响应式处理：监听窗口大小变化，自动触发收起
+const BREAKPOINT = 768; // 与 CSS 媒体查询保持一致
+let resizeTimer: number | null = null;
+
+function handleResize() {
+  if (resizeTimer) {
+    clearTimeout(resizeTimer);
+  }
+  resizeTimer = window.setTimeout(() => {
+    const windowWidth = window.innerWidth;
+    const shouldCollapse = windowWidth <= BREAKPOINT;
+
+    // 如果窗口宽度小于等于断点，且当前未收起，则自动收起
+    if (shouldCollapse && !isCollapse.value) {
+      isCollapse.value = true;
+    }
+    // 如果窗口宽度大于断点，且当前已收起，可以自动展开（可选）
+    // else if (!shouldCollapse && isCollapse.value) {
+    //   isCollapse.value = false;
+    // }
+  }, 100);
+}
 
 const customMenu: MenuItem[] = [
   {
@@ -448,6 +472,19 @@ onMounted(() => {
     }
     isInitialized.value = true;
   }
+
+  // 监听窗口大小变化
+  window.addEventListener("resize", handleResize);
+  // 初始化时检查一次
+  handleResize();
+});
+
+// 清理事件监听
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", handleResize);
+  if (resizeTimer) {
+    clearTimeout(resizeTimer);
+  }
 });
 </script>
 
@@ -459,8 +496,19 @@ onMounted(() => {
   height: 100vh;
 }
 .sidebar {
+  width: g.$sideBarWidth; // 展开时的宽度
+  min-width: 0; // 允许收缩到最小宽度
+  flex-shrink: 0; // 防止被压缩
   background-color: g.$menuBg;
   box-shadow: 2px 0 6px rgba(0, 0, 0, 0.1);
+  transition: width 0.3s ease; // 添加宽度过渡动画
+  overflow: hidden; // 防止内容溢出
+
+  // 收起时的宽度
+  &.collapse {
+    width: 64px;
+    min-width: 64px; // 确保最小宽度
+  }
 }
 .main-content {
   flex: 1;
@@ -491,9 +539,32 @@ onMounted(() => {
   padding: 10px;
   background-color: g.$contentBg;
 }
+// 当侧边栏收缩时，隐藏工具栏（输入框），但保留收起按钮
+.sidebar.collapse {
+  :deep(.tool) {
+    display: none !important;
+  }
+}
+
 @media (max-width: 768px) {
   .sidebar {
     width: 64px;
+    transition: width 0.3s ease; // 保持动画效果
+
+    // 确保在小屏幕时侧边栏处于收缩状态
+    &.collapse {
+      width: 64px;
+    }
+
+    // 隐藏工具栏（输入框），但保留收起按钮
+    :deep(.tool) {
+      display: none !important;
+    }
+
+    // 收起按钮始终显示
+    :deep(.collapse-button) {
+      display: flex !important;
+    }
   }
 }
 </style>

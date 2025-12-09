@@ -14,6 +14,12 @@ const app = createApp(App)
 
 app.use(pinia)
 app.use(router)
+
+// 初始化用户状态（恢复 Token）
+import { useUserStore } from '@/stores/modules/user'
+const userStore = useUserStore()
+userStore.restoreToken()
+
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
   app.component(key, component)   // 把 200+ 图标全部注册成全局组件
 }

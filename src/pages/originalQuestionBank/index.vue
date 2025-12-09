@@ -71,7 +71,7 @@
         :page-sizes="[10, 20, 50]"
         :total="total"
         layout="sizes, prev, pager, next, jumper"
-        small
+        size="small"
         background
         @size-change="fetchData"
         @current-change="fetchData"

@@ -58,3 +58,74 @@ export async function register(
   }
 }
 
+// 登录响应类型
+export interface LoginResponse extends ApiResponse {
+  data?: {
+    user: {
+      id: number
+      email: string
+      role: string
+      is_active: boolean
+      created_at: string
+    }
+    access_token: string
+    refresh_token: string
+    token_type: string
+    expires_in: number
+  }
+}
+
+// 刷新 Token 响应类型
+export interface RefreshTokenResponse extends ApiResponse {
+  data?: {
+    access_token: string
+    token_type: string
+    expires_in: number
+  }
+}
+
+// 用户登录
+export async function login(
+  email: string,
+  password: string
+): Promise<LoginResponse> {
+  try {
+    const response = await request.post<LoginResponse>('/login', {
+      email,
+      password,
+    })
+    return response
+  } catch (error: any) {
+    // 错误已经在拦截器中处理，这里直接抛出
+    throw error
+  }
+}
+
+// 刷新 Token
+export async function refreshToken(
+  refreshToken: string
+): Promise<RefreshTokenResponse> {
+  try {
+    const response = await request.post<RefreshTokenResponse>('/refresh-token', {
+      refresh_token: refreshToken,
+    })
+    return response
+  } catch (error: any) {
+    // 错误已经在拦截器中处理，这里直接抛出
+    throw error
+  }
+}
+
+// 用户登出
+export async function logout(refreshToken?: string): Promise<ApiResponse> {
+  try {
+    const response = await request.post<ApiResponse>('/logout', {
+      refresh_token: refreshToken,
+    })
+    return response
+  } catch (error: any) {
+    // 错误已经在拦截器中处理，这里直接抛出
+    throw error
+  }
+}
+

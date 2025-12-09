@@ -22,14 +22,92 @@ if (import.meta.env.DEV) {
   console.log('API Base URL:', API_BASE_URL)
 }
 
+// Token 刷新标志，防止并发刷新
+let isRefreshing = false
+let refreshSubscribers: Array<(token: string) => void> = []
+
+// 订阅 Token 刷新
+function subscribeTokenRefresh(cb: (token: string) => void) {
+  refreshSubscribers.push(cb)
+}
+
+// 通知所有订阅者
+function onTokenRefreshed(token: string) {
+  refreshSubscribers.forEach(cb => cb(token))
+  refreshSubscribers = []
+}
+
+// 检查并刷新 Token
+async function checkAndRefreshToken(): Promise<string | null> {
+  const refreshTokenValue = localStorage.getItem('refresh_token')
+  const expiresAt = localStorage.getItem('token_expires_at')
+  
+  if (!refreshTokenValue || !expiresAt) {
+    return null
+  }
+  
+  // 检查是否即将过期（提前5分钟）
+  const expiresAtTime = parseInt(expiresAt)
+  const now = Date.now()
+  const fiveMinutes = 5 * 60 * 1000
+  
+  // 如果还没到刷新时间，直接返回当前 token
+  if (now < expiresAtTime - fiveMinutes) {
+    return localStorage.getItem('access_token')
+  }
+  
+  // 如果正在刷新，等待刷新完成
+  if (isRefreshing) {
+    return new Promise((resolve) => {
+      subscribeTokenRefresh((token) => {
+        resolve(token)
+      })
+    })
+  }
+  
+  // 开始刷新
+  isRefreshing = true
+  try {
+    const { refreshToken } = await import('@/api/auth')
+    const response = await refreshToken(refreshTokenValue)
+    
+    if (response.success && response.data) {
+      const { access_token, expires_in } = response.data
+      const newExpiresAt = Date.now() + (expires_in - 300) * 1000
+      
+      localStorage.setItem('access_token', access_token)
+      localStorage.setItem('token_expires_at', newExpiresAt.toString())
+      
+      // 通知所有订阅者
+      onTokenRefreshed(access_token)
+      isRefreshing = false
+      
+      return access_token
+    }
+  } catch (error) {
+    // 刷新失败，清除 token
+    localStorage.removeItem('access_token')
+    localStorage.removeItem('refresh_token')
+    localStorage.removeItem('token_expires_at')
+    isRefreshing = false
+    return null
+  }
+  
+  isRefreshing = false
+  return null
+}
+
 // 请求拦截器
 request.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    // 可以在这里添加 token 等认证信息
-    // const token = localStorage.getItem('token')
-    // if (token && config.headers) {
-    //   config.headers.Authorization = `Bearer ${token}`
-    // }
+  async (config: InternalAxiosRequestConfig) => {
+    // 检查并刷新 Token（如果需要）
+    const token = await checkAndRefreshToken()
+    
+    // 添加 token 等认证信息
+    const accessToken = token || localStorage.getItem('access_token')
+    if (accessToken && config.headers) {
+      config.headers.Authorization = `Bearer ${accessToken}`
+    }
     return config
   },
   (error: AxiosError) => {
@@ -68,10 +146,30 @@ request.interceptors.response.use(
           ElMessage.error(data?.message || '请求参数错误')
           break
         case 401:
-          ElMessage.error('未授权，请重新登录')
-          // 可以在这里清除 token 并跳转到登录页
-          // localStorage.removeItem('token')
-          // router.push('/login')
+          // 处理 Token 过期或无效
+          const errorCode = data?.code
+          if (errorCode === 'INVALID_TOKEN' || errorCode === 'TOKEN_EXPIRED' || errorCode === 'INVALID_REFRESH_TOKEN' || errorCode === 'TOKEN_REVOKED' || errorCode === 'USER_NOT_FOUND') {
+            // 清除 token
+            localStorage.removeItem('access_token')
+            localStorage.removeItem('refresh_token')
+            localStorage.removeItem('token_expires_at')
+            
+            // 清除用户状态
+            import('@/stores/modules/user').then(({ useUserStore }) => {
+              const userStore = useUserStore()
+              userStore.clearCurrentUser()
+              userStore.clearToken()
+            })
+            
+            ElMessage.error(data?.message || '登录已过期，请重新登录')
+            
+            // 跳转到登录页
+            if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+              window.location.href = '/login'
+            }
+          } else {
+            ElMessage.error(data?.message || '未授权，请重新登录')
+          }
           break
         case 403:
           ElMessage.error('没有权限访问')

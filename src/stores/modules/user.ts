@@ -4,12 +4,21 @@ import { defineStore } from 'pinia'
 interface UserState {
   // 当前登录用户信息
   currentUser: {
-    id: string | null
+    id: string | number | null
     username: string
     email: string
     avatar: string
+    role: string
     roles: string[]
     permissions: string[]
+    is_active: boolean
+  }
+  // Token 信息
+  token: {
+    accessToken: string | null
+    refreshToken: string | null
+    expiresIn: number | null
+    expiresAt: number | null // 过期时间戳
   }
   // 用户列表（管理员功能）
   userList: Array<{
@@ -31,8 +40,16 @@ export const useUserStore = defineStore('user', {
       username: '',
       email: '',
       avatar: '',
+      role: '',
       roles: [],
-      permissions: []
+      permissions: [],
+      is_active: true
+    },
+    token: {
+      accessToken: null,
+      refreshToken: null,
+      expiresIn: null,
+      expiresAt: null
     },
     userList: [],
     loading: false
@@ -62,8 +79,16 @@ export const useUserStore = defineStore('user', {
         username: '',
         email: '',
         avatar: '',
+        role: '',
         roles: [],
-        permissions: []
+        permissions: [],
+        is_active: true
+      }
+      this.token = {
+        accessToken: null,
+        refreshToken: null,
+        expiresIn: null,
+        expiresAt: null
       }
     },
 
@@ -98,7 +123,57 @@ export const useUserStore = defineStore('user', {
       this.loading = loading
     },
 
-    // 模拟登录
+    // 设置 Token
+    setToken(accessToken: string, refreshToken: string, expiresIn: number) {
+      this.token.accessToken = accessToken
+      this.token.refreshToken = refreshToken
+      this.token.expiresIn = expiresIn
+      // 计算过期时间戳（提前5分钟刷新）
+      this.token.expiresAt = Date.now() + (expiresIn - 300) * 1000
+      
+      // 保存到 localStorage（持久化存储，关闭浏览器后仍保留）
+      localStorage.setItem('access_token', accessToken)
+      localStorage.setItem('refresh_token', refreshToken)
+      localStorage.setItem('token_expires_at', this.token.expiresAt.toString())
+    },
+
+    // 清除 Token
+    clearToken() {
+      this.token = {
+        accessToken: null,
+        refreshToken: null,
+        expiresIn: null,
+        expiresAt: null
+      }
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('refresh_token')
+      localStorage.removeItem('token_expires_at')
+    },
+
+    // 检查 Token 是否即将过期
+    isTokenExpiringSoon(): boolean {
+      if (!this.token.expiresAt) return false
+      return Date.now() >= this.token.expiresAt
+    },
+
+    // 从本地存储恢复 Token
+    restoreToken() {
+      const accessToken = localStorage.getItem('access_token')
+      const refreshToken = localStorage.getItem('refresh_token')
+      const expiresAt = localStorage.getItem('token_expires_at')
+      
+      if (accessToken && refreshToken && expiresAt) {
+        this.token.accessToken = accessToken
+        this.token.refreshToken = refreshToken
+        this.token.expiresAt = parseInt(expiresAt)
+        // 检查是否已过期
+        if (Date.now() >= this.token.expiresAt) {
+          this.clearToken()
+        }
+      }
+    },
+
+    // 模拟登录（保留原有方法，但实际登录会使用 API）
     async login(username: string, password: string) {
       this.setLoading(true)
 
@@ -112,6 +187,7 @@ export const useUserStore = defineStore('user', {
           username,
           email: `${username}@example.com`,
           avatar: 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png',
+          role: username.includes('admin') ? 'admin' : 'user',
           roles: username.includes('admin') ? ['admin', 'user'] : ['user'],
           permissions: username.includes('admin') ? ['read', 'write', 'delete'] : ['read']
         })
@@ -130,6 +206,7 @@ export const useUserStore = defineStore('user', {
     // 登出
     logout() {
       this.clearCurrentUser()
+      this.clearToken()
       localStorage.removeItem('auth_token')
     },
 
@@ -140,6 +217,11 @@ export const useUserStore = defineStore('user', {
 
     // 初始化用户数据（从本地存储恢复）
     initUser() {
+      // 恢复 Token
+      this.restoreToken()
+      
+      // 如果有 Token，可以尝试获取用户信息
+      // 这里暂时保留原有的逻辑作为备用
       const token = localStorage.getItem('auth_token')
       if (token) {
         // 模拟从token恢复用户信息
@@ -148,6 +230,7 @@ export const useUserStore = defineStore('user', {
           username: '恢复的用户',
           email: 'restored@example.com',
           avatar: 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png',
+          role: 'user',
           roles: ['user'],
           permissions: ['read']
         })
