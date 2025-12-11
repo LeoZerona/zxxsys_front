@@ -3,7 +3,7 @@
   <nav class="tabs-container">
     <!-- 横向滚动容器 -->
     <el-scrollbar ref="scrollRef" class="tab-scroll">
-      <div class="tag-wrapper">
+      <TransitionGroup name="tab-list" tag="div" class="tag-wrapper">
         <el-tag
           v-for="tab in visitedTabs"
           :key="tab.name"
@@ -19,7 +19,7 @@
             {{ tab.title }}
           </span>
         </el-tag>
-      </div>
+      </TransitionGroup>
     </el-scrollbar>
 
     <!-- 右键菜单 -->
@@ -130,6 +130,26 @@ onBeforeUnmount(() => {
     gap: 6px;
     padding: 4px 0;
     white-space: nowrap;
+  }
+
+  /* 标签删除/移动的过渡动画 */
+  .tab-list-enter-active {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .tab-list-leave-active {
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    position: absolute;
+  }
+  .tab-list-enter-from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  .tab-list-leave-to {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  .tab-list-move {
+    transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }
 }
 
