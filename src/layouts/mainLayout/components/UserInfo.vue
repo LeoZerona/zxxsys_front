@@ -24,19 +24,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed } from "vue";
 import { ArrowDown, User, Lock, SwitchButton } from "@element-plus/icons-vue";
+import { useUserStore } from "@/stores/modules/user";
 
 // 定义事件
 const emit = defineEmits<{
   (e: "command", command: "profile" | "password" | "logout"): void;
 }>();
 
-// 用户信息
-const userInfo = ref({
-  name: "管理员",
-  avatar: "https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png",
-});
+// 获取用户 store
+const userStore = useUserStore();
+
+// 用户信息（从 store 获取，如果没有则使用默认值）
+const userInfo = computed(() => ({
+  name: userStore.currentUser.username || userStore.currentUser.email || "用户",
+  avatar: userStore.currentUser.avatar || "https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png",
+}));
 
 // 处理下拉菜单命令
 const handleCommand = (command: "profile" | "password" | "logout") => {

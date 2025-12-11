@@ -52,6 +52,8 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount, nextTick } from "vue";
 import { useRouter, useRoute } from "vue-router";
+import { useUserStore } from "@/stores/modules/user";
+import { ElMessageBox } from "element-plus";
 import rightMenu from "./components/leftMenu/index.vue";
 // import rightMenu from "./components/rightMenu.vue";
 import type { MenuItem } from "./components/leftMenu/components/RecurseMenu.vue";
@@ -220,7 +222,9 @@ function handleMenuSelect(name: string) {
 }
 
 // 处理用户信息下拉菜单命令
-function handleUserCommand(command: "profile" | "password" | "logout") {
+async function handleUserCommand(command: "profile" | "password" | "logout") {
+  const userStore = useUserStore();
+  
   switch (command) {
     case "profile":
       // TODO: 跳转到个人中心页面
@@ -231,8 +235,29 @@ function handleUserCommand(command: "profile" | "password" | "logout") {
       console.log("打开修改密码对话框");
       break;
     case "logout":
-      // TODO: 退出登录逻辑
-      console.log("退出登录");
+      // 确认退出登录
+      try {
+        await ElMessageBox.confirm("确定要退出登录吗？", "提示", {
+          confirmButtonText: "确定",
+          cancelButtonText: "取消",
+          type: "warning",
+        });
+        
+        // 调用退出登录方法
+        await userStore.logout();
+        
+        // 清除标签页
+        visitedTabs.value = [];
+        activeTab.value = "";
+        
+        // 跳转到登录页
+        router.push({ name: "login" });
+      } catch (error) {
+        // 用户取消操作，不做任何处理
+        if (error !== "cancel") {
+          console.error("退出登录失败:", error);
+        }
+      }
       break;
   }
 }

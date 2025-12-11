@@ -204,10 +204,28 @@ export const useUserStore = defineStore('user', {
     },
 
     // 登出
-    logout() {
-      this.clearCurrentUser()
-      this.clearToken()
-      localStorage.removeItem('auth_token')
+    async logout() {
+      try {
+        // 调用退出登录 API
+        const { logout: logoutApi } = await import('@/api/auth')
+        const refreshToken = this.token.refreshToken || localStorage.getItem('refresh_token')
+        if (refreshToken) {
+          try {
+            await logoutApi(refreshToken)
+          } catch (error) {
+            // 即使 API 调用失败，也继续清除本地状态
+            console.warn('退出登录 API 调用失败:', error)
+          }
+        }
+      } catch (error) {
+        // 如果导入失败或其他错误，继续清除本地状态
+        console.warn('退出登录时发生错误:', error)
+      } finally {
+        // 无论 API 调用成功与否，都清除本地状态
+        this.clearCurrentUser()
+        this.clearToken()
+        localStorage.removeItem('auth_token')
+      }
     },
 
     // 检查用户权限
