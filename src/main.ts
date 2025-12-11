@@ -29,6 +29,11 @@ app.use(router)
 import { useUserStore } from '@/stores/modules/user'
 const userStore = useUserStore()
 userStore.restoreToken()
+userStore.restoreMenus()
+
+// 注册权限指令
+import { permission } from '@/directives/permission'
+app.directive('permission', permission)
 
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
   app.component(key, component)   // 把 200+ 图标全部注册成全局组件

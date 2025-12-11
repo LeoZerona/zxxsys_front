@@ -1,5 +1,6 @@
 
 import { defineStore } from 'pinia'
+import type { MenuItem } from '@/api/auth'
 
 interface UserState {
   // 当前登录用户信息
@@ -20,6 +21,8 @@ interface UserState {
     expiresIn: number | null
     expiresAt: number | null // 过期时间戳
   }
+  // 菜单列表
+  menus: MenuItem[]
   // 用户列表（管理员功能）
   userList: Array<{
     id: string
@@ -51,6 +54,7 @@ export const useUserStore = defineStore('user', {
       expiresIn: null,
       expiresAt: null
     },
+    menus: [],
     userList: [],
     loading: false
   }),
@@ -89,6 +93,27 @@ export const useUserStore = defineStore('user', {
         refreshToken: null,
         expiresIn: null,
         expiresAt: null
+      }
+      this.menus = []
+    },
+
+    // 设置菜单
+    setMenus(menus: MenuItem[]) {
+      this.menus = menus
+      // 保存到 localStorage
+      localStorage.setItem('user_menus', JSON.stringify(menus))
+    },
+
+    // 从本地存储恢复菜单
+    restoreMenus() {
+      const menusStr = localStorage.getItem('user_menus')
+      if (menusStr) {
+        try {
+          this.menus = JSON.parse(menusStr)
+        } catch (error) {
+          console.error('恢复菜单失败:', error)
+          this.menus = []
+        }
       }
     },
 
@@ -225,6 +250,7 @@ export const useUserStore = defineStore('user', {
         this.clearCurrentUser()
         this.clearToken()
         localStorage.removeItem('auth_token')
+        localStorage.removeItem('user_menus')
       }
     },
 
@@ -233,10 +259,23 @@ export const useUserStore = defineStore('user', {
       return this.currentUser.permissions.includes(permission)
     },
 
+    // 检查是否有任意一个权限
+    hasAnyPermission(permissions: string[]) {
+      return permissions.some(permission => this.hasPermission(permission))
+    },
+
+    // 检查是否有所有权限
+    hasAllPermissions(permissions: string[]) {
+      return permissions.every(permission => this.hasPermission(permission))
+    },
+
     // 初始化用户数据（从本地存储恢复）
     initUser() {
       // 恢复 Token
       this.restoreToken()
+      
+      // 恢复菜单
+      this.restoreMenus()
       
       // 如果有 Token，可以尝试获取用户信息
       // 这里暂时保留原有的逻辑作为备用

@@ -67,6 +67,21 @@ export interface CaptchaResponse extends ApiResponse {
   }
 }
 
+// 菜单项类型
+export interface MenuItem {
+  path: string
+  name: string
+  component: string
+  meta?: {
+    requiresAuth?: boolean
+    title?: string
+    icon?: string
+    hidden?: boolean
+  }
+  children?: MenuItem[]
+  permissions?: string[]
+}
+
 // 登录响应类型
 export interface LoginResponse extends ApiResponse {
   data?: {
@@ -81,6 +96,8 @@ export interface LoginResponse extends ApiResponse {
     refresh_token: string
     token_type: string
     expires_in: number
+    permissions?: string[]
+    menus?: MenuItem[]
   }
   code?: string // 错误代码
   requires_captcha?: boolean // 是否需要验证码

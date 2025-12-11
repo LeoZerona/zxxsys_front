@@ -50,7 +50,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onBeforeUnmount, nextTick } from "vue";
+import { ref, watch, onMounted, onBeforeUnmount, nextTick, computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useUserStore } from "@/stores/modules/user";
 import { ElMessageBox } from "element-plus";
@@ -60,6 +60,8 @@ import type { MenuItem } from "./components/leftMenu/components/RecurseMenu.vue"
 import TabsBar from "./components/TabsBar.vue";
 import UserInfo from "./components/UserInfo.vue";
 import type { ContextMenuType } from "@/components/contextMenu/index.vue";
+import { filterMenusByPermission } from "@/utils/permission";
+import type { MenuItem as ApiMenuItem } from "@/api/auth";
 
 /* ---------------- 数据 ---------------- */
 const isCollapse = ref(false);
@@ -88,23 +90,79 @@ function handleResize() {
   }, 100);
 }
 
-const customMenu: MenuItem[] = [
-  {
-    name: "QuestionBankManagement",
-    title: "题库管理",
-    icon: "Document",
-    children: [
-      { name: "originalQuestionBank", title: "原题库", icon: "" },
-      { name: "CleaningWarehouse", title: "清洗库", icon: "" },
-    ],
-  },
-  {
-    name: "examinationPaper",
-    title: "试卷",
-    icon: "Document",
-    children: [],
-  },
-];
+// 将后端菜单转换为前端菜单格式
+function convertApiMenuToMenuItem(apiMenu: ApiMenuItem): MenuItem {
+  const menuItem: MenuItem = {
+    name: apiMenu.name,
+    title: apiMenu.meta?.title || apiMenu.name,
+    icon: apiMenu.meta?.icon || "Document",
+  };
+
+  if (apiMenu.children && apiMenu.children.length > 0) {
+    menuItem.children = apiMenu.children
+      .map(child => convertApiMenuToMenuItem(child))
+      .filter(item => {
+        // 检查原始菜单的hidden属性
+        const originalMenu = findOriginalMenu(apiMenu.children || [], item.name);
+        return !originalMenu?.meta?.hidden;
+      });
+  }
+
+  return menuItem;
+}
+
+
+// 从store获取菜单并转换为前端格式
+const userStore = useUserStore();
+const customMenu = computed<MenuItem[]>(() => {
+  const apiMenus = userStore.menus;
+  if (!apiMenus || apiMenus.length === 0) {
+    // 如果没有菜单，返回默认菜单（向后兼容）
+    return [
+      {
+        name: "QuestionBankManagement",
+        title: "题库管理",
+        icon: "Document",
+        children: [
+          { name: "originalQuestionBank", title: "原题库", icon: "" },
+          { name: "CleaningWarehouse", title: "清洗库", icon: "" },
+        ],
+      },
+      {
+        name: "examinationPaper",
+        title: "试卷",
+        icon: "Document",
+        children: [],
+      },
+    ];
+  }
+
+  // 过滤菜单（根据权限）
+  const filteredMenus = filterMenusByPermission(apiMenus);
+  
+  // 转换为前端菜单格式
+  return filteredMenus
+    .map(menu => convertApiMenuToMenuItem(menu))
+    .filter(item => {
+      // 检查原始菜单的hidden属性
+      const originalMenu = findOriginalMenuInAll(apiMenus, item.name);
+      return !originalMenu?.meta?.hidden;
+    });
+});
+
+// 在所有菜单中查找原始菜单项（包括嵌套子菜单）
+function findOriginalMenuInAll(menus: ApiMenuItem[], name: string): ApiMenuItem | null {
+  for (const menu of menus) {
+    if (menu.name === name) {
+      return menu;
+    }
+    if (menu.children) {
+      const found = findOriginalMenuInAll(menu.children, name);
+      if (found) return found;
+    }
+  }
+  return null;
+}
 
 interface Tab {
   name: string;
@@ -161,6 +219,13 @@ function findMenuPath(
   }
   return null;
 }
+
+// 初始化菜单（从store恢复）
+onMounted(() => {
+  if (userStore.menus.length === 0) {
+    userStore.restoreMenus();
+  }
+});
 
 // 生成面包屑列表
 function generateBreadcrumb() {

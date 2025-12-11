@@ -1,103 +1,123 @@
-import { createRouter, createWebHistory } from "vue-router";
+import { createRouter, createWebHistory, type RouteRecordRaw } from "vue-router";
 import { useUserStore } from "@/stores/modules/user";
+import type { MenuItem } from "@/api/auth";
+import { filterMenusByPermission } from "@/utils/permission";
+
+// 基础路由（不需要权限控制的路由）
+const baseRoutes: RouteRecordRaw[] = [
+  {
+    path: "/",
+    alias: ["/login"],
+    name: "login",
+    component: () => import("@/pages/login/index.vue"),
+    meta: {
+      requiresAuth: false, // 登录页不需要认证
+    },
+  },
+  {
+    path: "/unauthorized",
+    name: "unauthorized",
+    component: () => import("@/pages/unauthorized/index.vue"),
+    meta: {
+      requiresAuth: false, // 未登录页面不需要认证
+    },
+  },
+  {
+    path: "/a",
+    name: "login1",
+    component: () => import("@/pages/login/index1.vue"),
+    meta: {
+      requiresAuth: false,
+    },
+  },
+  {
+    path: "/:pathMatch(.*)*",
+    name: "not-found",
+    component: () => import("@/pages/404/index.vue"),
+    meta: {
+      requiresAuth: false,
+    },
+  },
+];
+
+// 组件路径映射（将后端返回的路径映射到实际的组件）
+const componentMap: Record<string, () => Promise<any>> = {
+  '@/pages/second/index.vue': () => import('@/pages/second/index.vue'),
+  '@/pages/test/index.vue': () => import('@/pages/test/index.vue'),
+  '@/pages/originalQuestionBank/index.vue': () => import('@/pages/originalQuestionBank/index.vue'),
+  '@/pages/cleaningWarehouse/index.vue': () => import('@/pages/cleaningWarehouse/index.vue'),
+  '@/pages/examinationPaper/index.vue': () => import('@/pages/examinationPaper/index.vue'),
+  '@/pages/originalQuestionBank/detail/index.vue': () => import('@/pages/originalQuestionBank/detail/index.vue'),
+  '@/pages/originalQuestionBank/questionType/index.vue': () => import('@/pages/originalQuestionBank/questionType/index.vue'),
+}
+
+// 将菜单转换为路由
+function menuToRoute(menu: MenuItem): RouteRecordRaw | null {
+  try {
+    // 获取组件导入函数
+    const componentLoader = componentMap[menu.component]
+    if (!componentLoader) {
+      console.warn(`未找到组件映射: ${menu.component}`)
+      return null
+    }
+
+    const route: RouteRecordRaw = {
+      path: menu.path,
+      name: menu.name,
+      component: componentLoader,
+      meta: {
+        ...menu.meta,
+        requiresAuth: menu.meta?.requiresAuth !== false,
+        title: menu.meta?.title || menu.name,
+        icon: menu.meta?.icon,
+        hidden: menu.meta?.hidden || false,
+        permissions: menu.permissions || []
+      }
+    }
+
+    // 处理子路由
+    if (menu.children && menu.children.length > 0) {
+      route.children = menu.children
+        .map(child => menuToRoute(child))
+        .filter((r): r is RouteRecordRaw => r !== null)
+    }
+
+    return route
+  } catch (error) {
+    console.error(`转换菜单为路由失败: ${menu.name}`, error)
+    return null
+  }
+}
+
+// 动态添加菜单路由
+export function addMenuRoutes() {
+  const userStore = useUserStore()
+  const menus = userStore.menus
+
+  if (!menus || menus.length === 0) {
+    return
+  }
+
+  // 过滤菜单（根据权限）
+  const filteredMenus = filterMenusByPermission(menus)
+
+  // 将菜单转换为路由
+  const menuRoutes = filteredMenus
+    .map(menu => menuToRoute(menu))
+    .filter((r): r is RouteRecordRaw => r !== null)
+
+  // 添加路由到路由器
+  menuRoutes.forEach(route => {
+    // 检查路由是否已存在
+    if (!router.hasRoute(route.name as string)) {
+      router.addRoute(route)
+    }
+  })
+}
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
-  routes: [
-    {
-      path: "/",
-      alias: ["/login"],
-      name: "login",
-      component: () => import("@/pages/login/index.vue"),
-      meta: {
-        requiresAuth: false, // 登录页不需要认证
-      },
-    },
-    {
-      path: "/unauthorized",
-      name: "unauthorized",
-      component: () => import("@/pages/unauthorized/index.vue"),
-      meta: {
-        requiresAuth: false, // 未登录页面不需要认证
-      },
-    },
-    {
-      path: "/a",
-      name: "login1",
-      component: () => import("@/pages/login/index1.vue"),
-      meta: {
-        requiresAuth: false,
-      },
-    },
-    {
-      path: "/second",
-      name: "second",
-      component: () => import("@/pages/second/index.vue"),
-      meta: {
-        requiresAuth: true, // 需要登录认证
-      },
-      children: [
-        {
-          path: "test", // 测试页
-          name: "test",
-          component: () => import("@/pages/test/index.vue"),
-          meta: {
-            requiresAuth: true,
-          },
-        },
-        {
-          path: "originalQuestionBank", // 原题库
-          name: "originalQuestionBank",
-          component: () => import("@/pages/originalQuestionBank/index.vue"),
-          meta: {
-            requiresAuth: true,
-          },
-        },
-        {
-          path: "cleaningWarehouse", // 清洗库
-          name: "CleaningWarehouse",
-          component: () => import("@/pages/cleaningWarehouse/index.vue"),
-          meta: {
-            requiresAuth: true,
-          },
-        },
-        {
-          path: "examinationPaper", // 试卷，测试用
-          name: "examinationPaper",
-          component: () => import("@/pages/examinationPaper/index.vue"),
-          meta: {
-            requiresAuth: true,
-          },
-        },
-        {
-          path: "questionBankDetail/:id", // 题库内容详情页
-          name: "questionBankDetail",
-          component: () => import("@/pages/originalQuestionBank/detail/index.vue"),
-          props: true,
-          meta: {
-            requiresAuth: true,
-          },
-        },
-        {
-          path: "questionTypeDetail/:bankId/:type", // 题目类型专门页面
-          name: "questionTypeDetail",
-          component: () => import("@/pages/originalQuestionBank/questionType/index.vue"),
-          props: true,
-          meta: {
-            requiresAuth: true,
-          },
-        },
-      ],
-    },
-    {
-      path: "/:pathMatch(.*)*",
-      name: "not-found",
-      component: () => import("@/pages/404/index.vue"),
-      meta: {
-        requiresAuth: false,
-      },
-    },
-  ],
+  routes: baseRoutes,
 });
 
 // 路由守卫：检查用户登录状态
@@ -112,6 +132,16 @@ router.beforeEach((to, from, next) => {
     // 尝试恢复 Token（如果存在）
     if (!userStore.token.accessToken) {
       userStore.restoreToken()
+    }
+    
+    // 恢复菜单
+    if (userStore.menus.length === 0) {
+      userStore.restoreMenus()
+    }
+    
+    // 如果菜单已加载，动态添加路由
+    if (userStore.menus.length > 0) {
+      addMenuRoutes()
     }
     
     // 检查是否有 access token

@@ -57,7 +57,11 @@
               v-model="form.password"
               type="password"
               :prefix-icon="Lock"
-              :placeholder="isRegister ? '请输入密码（至少8位，包含数字、大小写字母和特殊字符）' : '请输入密码'"
+              :placeholder="
+                isRegister
+                  ? '请输入密码（至少8位，包含数字、大小写字母和特殊字符）'
+                  : '请输入密码'
+              "
               show-password
               clearable
             />
@@ -69,33 +73,51 @@
               popper-class="password-strength-popover"
             >
               <template #reference>
-                <el-icon class="password-hint-icon" :class="{ 'has-error': !isPasswordValid }">
+                <el-icon
+                  class="password-hint-icon"
+                  :class="{ 'has-error': !isPasswordValid }"
+                >
                   <InfoFilled v-if="!isPasswordValid" />
                   <CircleCheck v-else />
                 </el-icon>
               </template>
               <div class="password-hint">
-                <div class="hint-item" :class="{ valid: passwordChecks.hasNumber }">
+                <div
+                  class="hint-item"
+                  :class="{ valid: passwordChecks.hasNumber }"
+                >
                   <span v-if="passwordChecks.hasNumber">✓</span>
                   <span v-else>✗</span>
                   包含数字
                 </div>
-                <div class="hint-item" :class="{ valid: passwordChecks.hasLowercase }">
+                <div
+                  class="hint-item"
+                  :class="{ valid: passwordChecks.hasLowercase }"
+                >
                   <span v-if="passwordChecks.hasLowercase">✓</span>
                   <span v-else>✗</span>
                   包含小写字母
                 </div>
-                <div class="hint-item" :class="{ valid: passwordChecks.hasUppercase }">
+                <div
+                  class="hint-item"
+                  :class="{ valid: passwordChecks.hasUppercase }"
+                >
                   <span v-if="passwordChecks.hasUppercase">✓</span>
                   <span v-else>✗</span>
                   包含大写字母
                 </div>
-                <div class="hint-item" :class="{ valid: passwordChecks.hasSpecial }">
+                <div
+                  class="hint-item"
+                  :class="{ valid: passwordChecks.hasSpecial }"
+                >
                   <span v-if="passwordChecks.hasSpecial">✓</span>
                   <span v-else>✗</span>
                   包含特殊字符
                 </div>
-                <div class="hint-item" :class="{ valid: passwordChecks.hasMinLength }">
+                <div
+                  class="hint-item"
+                  :class="{ valid: passwordChecks.hasMinLength }"
+                >
                   <span v-if="passwordChecks.hasMinLength">✓</span>
                   <span v-else>✗</span>
                   长度至少8位（{{ passwordChecks.length }}/8）
@@ -107,8 +129,12 @@
           <div v-if="isDev" class="dev-switch">
             <el-switch
               v-model="enablePasswordValidation"
-              :active-text="isRegister ? '启用密码强度验证' : '启用密码强度验证'"
-              :inactive-text="isRegister ? '禁用密码强度验证' : '禁用密码强度验证'"
+              :active-text="
+                isRegister ? '启用密码强度验证' : '启用密码强度验证'
+              "
+              :inactive-text="
+                isRegister ? '禁用密码强度验证' : '禁用密码强度验证'
+              "
               size="small"
             />
           </div>
@@ -135,7 +161,11 @@
               maxlength="4"
               clearable
             />
-            <div class="captcha-box" @click="refreshCaptcha" title="看不清？点击刷新">
+            <div
+              class="captcha-box"
+              @click="refreshCaptcha"
+              title="看不清？点击刷新"
+            >
               <canvas
                 ref="captchaCanvasRef"
                 class="captcha-canvas"
@@ -255,33 +285,51 @@
               popper-class="password-strength-popover"
             >
               <template #reference>
-                <el-icon class="password-hint-icon" :class="{ 'has-error': !isResetPasswordValid }">
+                <el-icon
+                  class="password-hint-icon"
+                  :class="{ 'has-error': !isResetPasswordValid }"
+                >
                   <InfoFilled v-if="!isResetPasswordValid" />
                   <CircleCheck v-else />
                 </el-icon>
               </template>
               <div class="password-hint">
-                <div class="hint-item" :class="{ valid: resetPasswordChecks.hasNumber }">
+                <div
+                  class="hint-item"
+                  :class="{ valid: resetPasswordChecks.hasNumber }"
+                >
                   <span v-if="resetPasswordChecks.hasNumber">✓</span>
                   <span v-else>✗</span>
                   包含数字
                 </div>
-                <div class="hint-item" :class="{ valid: resetPasswordChecks.hasLowercase }">
+                <div
+                  class="hint-item"
+                  :class="{ valid: resetPasswordChecks.hasLowercase }"
+                >
                   <span v-if="resetPasswordChecks.hasLowercase">✓</span>
                   <span v-else>✗</span>
                   包含小写字母
                 </div>
-                <div class="hint-item" :class="{ valid: resetPasswordChecks.hasUppercase }">
+                <div
+                  class="hint-item"
+                  :class="{ valid: resetPasswordChecks.hasUppercase }"
+                >
                   <span v-if="resetPasswordChecks.hasUppercase">✓</span>
                   <span v-else>✗</span>
                   包含大写字母
                 </div>
-                <div class="hint-item" :class="{ valid: resetPasswordChecks.hasSpecial }">
+                <div
+                  class="hint-item"
+                  :class="{ valid: resetPasswordChecks.hasSpecial }"
+                >
                   <span v-if="resetPasswordChecks.hasSpecial">✓</span>
                   <span v-else>✗</span>
                   包含特殊字符
                 </div>
-                <div class="hint-item" :class="{ valid: resetPasswordChecks.hasMinLength }">
+                <div
+                  class="hint-item"
+                  :class="{ valid: resetPasswordChecks.hasMinLength }"
+                >
                   <span v-if="resetPasswordChecks.hasMinLength">✓</span>
                   <span v-else>✗</span>
                   长度至少8位（{{ resetPasswordChecks.length }}/8）
@@ -328,13 +376,28 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, computed, onBeforeUnmount, nextTick, watch, onMounted } from "vue";
+import {
+  reactive,
+  ref,
+  computed,
+  onBeforeUnmount,
+  nextTick,
+  watch,
+  onMounted,
+} from "vue";
 import { ElMessage, type FormInstance, type FormRules } from "element-plus";
-import { User, Lock, Message, InfoFilled, CircleCheck } from "@element-plus/icons-vue";
+import {
+  User,
+  Lock,
+  Message,
+  InfoFilled,
+  CircleCheck,
+} from "@element-plus/icons-vue";
 import CryptoJS from "crypto-js";
 import { useRouter } from "vue-router";
 import { sendVerificationCode, register, login, getCaptcha } from "@/api/auth";
 import { useUserStore } from "@/stores/modules/user";
+import { addMenuRoutes } from "@/router";
 import Captcha from "captcha-mini";
 
 /* -------------- 路由和 Store -------------- */
@@ -442,43 +505,43 @@ const validatePassword = (_rule: any, value: string, callback: any) => {
     callback(new Error("请输入密码"));
     return;
   }
-  
+
   // 如果禁用了密码强度验证，只检查是否为空
   if (!enablePasswordValidation.value) {
     callback();
     return;
   }
-  
+
   // 检查密码长度（至少8位）
   if (value.length < 8) {
     callback(new Error("密码长度至少为8位"));
     return;
   }
-  
+
   // 检查是否包含数字
   if (!/\d/.test(value)) {
     callback(new Error("密码必须包含至少一个数字"));
     return;
   }
-  
+
   // 检查是否包含小写字母
   if (!/[a-z]/.test(value)) {
     callback(new Error("密码必须包含至少一个小写字母"));
     return;
   }
-  
+
   // 检查是否包含大写字母
   if (!/[A-Z]/.test(value)) {
     callback(new Error("密码必须包含至少一个大写字母"));
     return;
   }
-  
+
   // 检查是否包含特殊字符
   if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(value)) {
     callback(new Error("密码必须包含至少一个特殊字符（如 !@#$%^&* 等）"));
     return;
   }
-  
+
   callback();
 };
 
@@ -530,7 +593,7 @@ const isValidEmail = computed(() => {
 
 // 密码强度检查计算属性
 const passwordChecks = computed(() => {
-  const pwd = form.password || '';
+  const pwd = form.password || "";
   return {
     hasNumber: /\d/.test(pwd),
     hasLowercase: /[a-z]/.test(pwd),
@@ -543,7 +606,7 @@ const passwordChecks = computed(() => {
 
 // 重置密码强度检查计算属性
 const resetPasswordChecks = computed(() => {
-  const pwd = resetPasswordForm.newPassword || '';
+  const pwd = resetPasswordForm.newPassword || "";
   return {
     hasNumber: /\d/.test(pwd),
     hasLowercase: /[a-z]/.test(pwd),
@@ -673,33 +736,33 @@ const fetchCaptchaFromBackend = async () => {
 // 使用指定文本绘制验证码图形
 const drawCaptchaWithText = (text: string) => {
   if (!captchaCanvasRef.value) return;
-  
+
   const canvas = captchaCanvasRef.value;
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext("2d");
   if (!ctx) return;
-  
+
   // 配置验证码参数
   const captcha = new Captcha({
     fontSize: 22,
-    fontFamily: ['Arial', 'Helvetica', 'Georgia', '微软雅黑'],
+    fontFamily: ["Arial", "Helvetica", "Georgia", "微软雅黑"],
     lineWidth: 0.8,
     lineNum: 3,
     dotR: 1.5,
     dotNum: 18,
     preGroundColor: [30, 80],
     backGroundColor: [220, 255],
-    fontStyle: 'fill',
+    fontStyle: "fill",
     length: text.length,
   });
-  
+
   // 清空画布
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  
+
   // 绘制背景
   const bgColors = captcha.getColor(captcha.backGroundColor);
   ctx.fillStyle = `rgba(${bgColors[0]}, ${bgColors[1]}, ${bgColors[2]}, 0.8)`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  
+
   // 绘制干扰点
   for (let i = 0; i < captcha.dotNum; i++) {
     const x = captcha.getRandom(0, canvas.width);
@@ -711,7 +774,7 @@ const drawCaptchaWithText = (text: string) => {
     ctx.fillStyle = `rgba(${colors[0]}, ${colors[1]}, ${colors[2]}, 0.6)`;
     ctx.fill();
   }
-  
+
   // 绘制直线干扰线
   for (let i = 0; i < captcha.lineNum; i++) {
     const x = captcha.getRandom(0, canvas.width);
@@ -726,7 +789,7 @@ const drawCaptchaWithText = (text: string) => {
     ctx.lineTo(endX, endY);
     ctx.stroke();
   }
-  
+
   // 绘制曲线干扰线
   for (let i = 0; i < 2; i++) {
     const startX = captcha.getRandom(0, canvas.width);
@@ -737,7 +800,7 @@ const drawCaptchaWithText = (text: string) => {
     const cp2Y = captcha.getRandom(0, canvas.height);
     const endX = captcha.getRandom(0, canvas.width);
     const endY = captcha.getRandom(0, canvas.height);
-    
+
     ctx.beginPath();
     ctx.lineWidth = captcha.lineWidth * 0.8;
     const colors = captcha.getColor(captcha.preGroundColor);
@@ -746,16 +809,18 @@ const drawCaptchaWithText = (text: string) => {
     ctx.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, endX, endY);
     ctx.stroke();
   }
-  
+
   // 绘制文字
-  ctx.font = `${captcha.fontSize}px ${captcha.fontFamily[captcha.getRandom(0, captcha.fontFamily.length)]}`;
-  ctx.textBaseline = 'middle';
-  
+  ctx.font = `${captcha.fontSize}px ${
+    captcha.fontFamily[captcha.getRandom(0, captcha.fontFamily.length)]
+  }`;
+  ctx.textBaseline = "middle";
+
   const totalWidth = canvas.width;
   const charWidth = totalWidth / text.length;
   const startOffset = 0.1;
   const endOffset = 0.3;
-  
+
   for (let i = 0; i < text.length; i++) {
     const fontWidth = ctx.measureText(text[i]).width;
     const x = captcha.getRandom(
@@ -767,7 +832,7 @@ const drawCaptchaWithText = (text: string) => {
     ctx.fillStyle = `rgba(${colors[0]}, ${colors[1]}, ${colors[2]}, 0.9)`;
     ctx.save();
     ctx.translate(x, canvas.height / 2);
-    ctx.rotate(deg * Math.PI / 180);
+    ctx.rotate((deg * Math.PI) / 180);
     ctx.fillText(text[i], 0, 0);
     ctx.restore();
   }
@@ -777,20 +842,20 @@ const drawCaptchaWithText = (text: string) => {
 const drawCaptcha = async () => {
   await nextTick();
   if (!captchaCanvasRef.value) return;
-  
+
   const captcha = new Captcha({
     fontSize: 22,
-    fontFamily: ['Arial', 'Helvetica', 'Georgia', '微软雅黑'],
+    fontFamily: ["Arial", "Helvetica", "Georgia", "微软雅黑"],
     lineWidth: 0.8,
     lineNum: 3,
     dotR: 1.5,
     dotNum: 18,
     preGroundColor: [30, 80],
     backGroundColor: [220, 255],
-    fontStyle: 'fill',
+    fontStyle: "fill",
     length: 4,
   });
-  
+
   const captchaTextValue = captcha.getText();
   captchaText.value = captchaTextValue;
   drawCaptchaWithText(captchaTextValue);
@@ -842,18 +907,18 @@ const sendEmailCode = async () => {
   sendingCode.value = true;
   try {
     const response = await sendVerificationCode(form.username);
-    
+
     if (response.success) {
       ElMessage.success(response.message || "验证码已发送，请查收邮箱");
-      
+
       // 如果返回了 cooldown_seconds，使用该值作为倒计时
       const cooldownSeconds = response.cooldown_seconds || 60;
-      
+
       // 清除之前的定时器
       if (countdownTimer) {
         clearInterval(countdownTimer);
       }
-      
+
       // 开始倒计时
       codeCountdown.value = cooldownSeconds;
       countdownTimer = window.setInterval(() => {
@@ -893,7 +958,7 @@ const sendEmailCode = async () => {
 /* -------------- 提交 -------------- */
 const handleSubmit = async () => {
   if (!ruleFormRef.value) return;
-  
+
   await ruleFormRef.value.validate((valid) => {
     if (!valid) {
       const errorMsg = isRegister.value
@@ -902,14 +967,14 @@ const handleSubmit = async () => {
       ElMessage.error(errorMsg);
       return;
     }
-    
+
     loading.value = true;
-    
+
     if (isRegister.value) {
       // 注册逻辑
       // 对密码进行MD5加密
       const encryptedPassword = CryptoJS.MD5(form.password).toString();
-      
+
       register(form.username, encryptedPassword, form.emailCode)
         .then((response) => {
           if (response.success) {
@@ -934,43 +999,61 @@ const handleSubmit = async () => {
       // 登录逻辑
       // 对密码进行MD5加密
       const encryptedPassword = CryptoJS.MD5(form.password).toString();
-      
+
       // 如果需要验证码，传递验证码参数
-      const captchaKey = requiresCaptcha.value ? captchaSessionKey.value : undefined;
+      const captchaKey = requiresCaptcha.value
+        ? captchaSessionKey.value
+        : undefined;
       const captchaCode = requiresCaptcha.value ? form.captcha : undefined;
-      
+
       login(form.username, encryptedPassword, captchaKey, captchaCode)
         .then((response) => {
           if (response.success && response.data) {
-            const { user, access_token, refresh_token, expires_in } = response.data;
-            
+            const {
+              user,
+              access_token,
+              refresh_token,
+              expires_in,
+              permissions,
+              menus,
+            } = response.data;
+
             // 保存用户信息和 Token
             userStore.setCurrentUser({
               id: user.id,
               email: user.email,
-              username: user.email.split('@')[0], // 从邮箱提取用户名
+              username: user.email.split("@")[0], // 从邮箱提取用户名
               role: user.role,
               roles: [user.role],
               is_active: user.is_active,
-              avatar: '',
-              permissions: []
+              avatar: "",
+              permissions: permissions || [],
             });
             userStore.setToken(access_token, refresh_token, expires_in);
-            
+
+            // 保存菜单和权限
+            if (menus && menus.length > 0) {
+              userStore.setMenus(menus);
+              // 动态添加路由
+              nextTick(() => {
+                addMenuRoutes();
+              });
+            }
+
             ElMessage.success(response.message || "登录成功");
-            
+
             // 登录成功后重置验证码状态
             requiresCaptcha.value = false;
             captchaSessionKey.value = "";
             form.captcha = "";
-            
+
             // 跳转到首页或指定页面
             router.push({ name: "originalQuestionBank" });
           }
         })
         .catch((error: any) => {
           // 检查是否需要验证码
-          if (error.code === 'REQUIRES_CAPTCHA' || error.requires_captcha) {
+          if (error.code === "REQUIRES_CAPTCHA" || error.requires_captcha) {
             requiresCaptcha.value = true;
             // 自动获取验证码
             fetchCaptchaFromBackend().then((success) => {
@@ -978,7 +1061,7 @@ const handleSubmit = async () => {
                 ElMessage.warning("登录失败次数过多，请输入验证码");
               }
             });
-          } else if (error.code === 'INVALID_CAPTCHA') {
+          } else if (error.code === "INVALID_CAPTCHA") {
             // 验证码错误，刷新验证码
             if (requiresCaptcha.value) {
               fetchCaptchaFromBackend();
@@ -1233,18 +1316,18 @@ $radius: 8px;
   display: flex;
   align-items: center;
   gap: 8px;
-  
+
   .el-input {
     flex: 1;
   }
-  
+
   .password-hint-icon {
     font-size: 18px;
     cursor: pointer;
     color: #67c23a;
     transition: color 0.3s;
     flex-shrink: 0;
-    
+
     &.has-error {
       color: #f56c6c;
     }
@@ -1255,18 +1338,18 @@ $radius: 8px;
 .password-hint {
   padding: 4px 0;
   font-size: 12px;
-  
+
   .hint-item {
     display: flex;
     align-items: center;
     gap: 6px;
     margin-bottom: 6px;
     color: #909399;
-    
+
     &:last-child {
       margin-bottom: 0;
     }
-    
+
     span {
       display: inline-block;
       width: 16px;
@@ -1274,7 +1357,7 @@ $radius: 8px;
       font-weight: bold;
       font-size: 14px;
     }
-    
+
     &.valid {
       color: #67c23a;
     }
@@ -1311,7 +1394,7 @@ $radius: 8px;
     font-size: 14px;
     color: #0c4a6e;
     letter-spacing: 2px;
-    font-family: 'Courier New', monospace;
+    font-family: "Courier New", monospace;
   }
 }
 
