@@ -64,7 +64,10 @@
         :fixed="col.fixed"
       >
         <template #default="{ row }">
-          <span v-if="!col.actionButtons">
+          <span 
+            v-if="!col.actionButtons"
+            :class="{ 'multi-line-answer': col.prop === 'correctAnswer' && (row.type === '4' || row.type === '8') }"
+          >
             {{
               col.formatter ? col.formatter(row[col.prop], row) : row[col.prop]
             }}
@@ -125,6 +128,7 @@ import TableToolBar from "@/components/tableToolBar/index.vue";
 import QuestionDetailDialog from "./components/QuestionDetailDialog.vue";
 import QuestionEditDialog from "./components/QuestionEditDialog.vue";
 import { getQuestionList, type Question } from "@/api/question";
+import { stripHtmlTags } from "@/utils/common";
 
 // TableToolBar 列配置类型
 interface IColumn {
@@ -135,6 +139,20 @@ interface IColumn {
 }
 
 /* ===================== 类型定义 ===================== */
+// 计算分析题子题
+interface SubQuestionItem {
+  calcchild_id: number;
+  type: string; // 1=分录题, 2=填空题, 3=不定项选择
+  content: string;
+  answer: {
+    answer_content?: string;
+    option_true?: string;
+  };
+  options?: Array<{ label: string; content: string }>;
+  analysis?: string;
+  sort: number;
+}
+
 interface QuestionItem {
   questionId: number | string;
   subject: string; // 科目
@@ -148,8 +166,11 @@ interface QuestionItem {
   updatedAt?: string | Date;
   // 详细信息
   options?: Array<{ label: string; content: string }> | string[]; // 选择题选项
-  correctAnswer?: string | string[]; // 正确答案
+  correctAnswer?: string | string[]; // 正确答案（普通题型）
   analysis?: string; // 题目解析
+  // 计算分析题特有字段
+  subQuestions?: SubQuestionItem[]; // 计算分析题的子题
+  answerType2?: string; // 计算分析题类型：1=分录题, 2=填空题
   knowledgePoint?: string;
   tags?: string[];
   usageCount?: number;
@@ -275,37 +296,94 @@ function convertQuestion(question: Question): QuestionItem {
   const typeCode = question.type;
   const convertedType = convertTypeCode(typeCode);
   
-  // 处理答案
+  // 处理答案（去除HTML标签）
   let correctAnswer: string | string[] = "";
+  let subQuestions: SubQuestionItem[] | undefined = undefined;
+  let answerType2: string | undefined = undefined;
+  
   if (question.answer) {
-    if (question.answer.correct_answer) {
-      correctAnswer = question.answer.correct_answer;
-    } else if (question.answer.answer_content) {
-      correctAnswer = question.answer.answer_content;
-    } else if (question.answer.option_true) {
-      correctAnswer = question.answer.option_true;
+    // 计算分析题（type=8）的特殊处理
+    if (typeCode === "8" && question.answer.sub_questions) {
+      answerType2 = question.answer.type2;
+      subQuestions = question.answer.sub_questions.map(subQ => ({
+        calcchild_id: subQ.calcchild_id,
+        type: subQ.type,
+        content: stripHtmlTags(subQ.content),
+        answer: {
+          answer_content: subQ.answer.answer_content 
+            ? stripHtmlTags(subQ.answer.answer_content) 
+            : undefined,
+          option_true: subQ.answer.option_true 
+            ? stripHtmlTags(subQ.answer.option_true) 
+            : undefined,
+        },
+        options: subQ.options 
+          ? subQ.options.map(opt => ({
+              label: stripHtmlTags(opt.label),
+              content: stripHtmlTags(opt.content),
+            }))
+          : undefined,
+        analysis: subQ.analysis ? stripHtmlTags(subQ.analysis) : undefined,
+        sort: subQ.sort,
+      }));
+      // 计算分析题的答案：格式化为（1）答案1（2）答案2...，多个答案分行显示
+      const answerParts: string[] = [];
+      subQuestions.forEach((subQ, index) => {
+        let answerText = "";
+        if (subQ.answer.option_true) {
+          // 如果是选项答案（可能包含多个选项，用逗号等分隔）
+          const options = String(subQ.answer.option_true).split(/[,，、\s]+/).map(v => v.trim()).filter(v => v);
+          answerText = options.join("、"); // 多个选项用顿号连接
+        } else if (subQ.answer.answer_content) {
+          answerText = subQ.answer.answer_content;
+        } else {
+          answerText = "无答案";
+        }
+        // 如果答案过长，截断显示
+        if (answerText.length > 30) {
+          answerText = answerText.substring(0, 30) + "...";
+        }
+        answerParts.push(`（${index + 1}）${answerText}`);
+      });
+      // 使用换行符连接，每个子题答案一行
+      correctAnswer = answerParts.join("\n");
+    } else {
+      // 普通题型的答案处理
+      if (question.answer.correct_answer) {
+        if (Array.isArray(question.answer.correct_answer)) {
+          correctAnswer = question.answer.correct_answer.map(ans => stripHtmlTags(ans));
+        } else {
+          correctAnswer = stripHtmlTags(question.answer.correct_answer);
+        }
+      } else if (question.answer.answer_content) {
+        correctAnswer = stripHtmlTags(question.answer.answer_content);
+      } else if (question.answer.option_true) {
+        correctAnswer = stripHtmlTags(question.answer.option_true);
+      }
     }
   }
 
-  // 处理选项
+  // 处理选项（去除HTML标签）
   let options: Array<{ label: string; content: string }> | string[] = [];
   if (question.options && question.options.length > 0) {
     options = question.options.map(opt => ({
-      label: opt.label,
-      content: opt.content,
+      label: stripHtmlTags(opt.label),
+      content: stripHtmlTags(opt.content),
     }));
   }
 
   return {
     questionId: question.question_id,
-    subject: question.subject_name || "",
+    subject: stripHtmlTags(question.subject_name || ""),
     subjectId: question.subject_id,
-    content: question.content,
+    content: stripHtmlTags(question.content), // 去除题目内容中的HTML标签
     questionType: convertedType as any,
     type: typeCode,
     correctAnswer: correctAnswer,
-    analysis: question.analysis,
+    analysis: question.analysis ? stripHtmlTags(question.analysis) : undefined, // 去除解析中的HTML标签
     options: options,
+    subQuestions: subQuestions, // 计算分析题的子题
+    answerType2: answerType2, // 计算分析题类型
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -343,7 +421,14 @@ const columns = computed<Column[]>(() => {
     {
       prop: "questionId",
       label: "题目编号",
-      width: 100,
+      width: 150,
+      formatter: (val, row) => {
+        // 如果是计算分析题，在编号后显示子题数量
+        if (row.type === "8" && row.subQuestions && row.subQuestions.length > 0) {
+          return `${val} (${row.subQuestions.length}道子题)`;
+        }
+        return val;
+      },
     },
     {
       prop: "subject",
@@ -359,17 +444,19 @@ const columns = computed<Column[]>(() => {
     },
     {
       prop: "content",
-      label: selectedType.value === "fill" ? "题目内容（含填空）" : "题目内容",
+      label: selectedType.value === "4" ? "题目内容（含填空）" : "题目内容",
       minWidth: 300,
       align: "left",
       searchType: "input",
       formatter: (val) => {
+        // 去除HTML标签
+        const cleanContent = stripHtmlTags(val);
         // 填空题可能需要显示更长的内容
-        const maxLength = selectedType.value === "fill" ? 150 : 100;
-        if (typeof val === "string" && val.length > maxLength) {
-          return val.substring(0, maxLength) + "...";
+        const maxLength = selectedType.value === "4" ? 150 : 100;
+        if (cleanContent.length > maxLength) {
+          return cleanContent.substring(0, maxLength) + "...";
         }
-        return val;
+        return cleanContent;
       },
     },
   ];
@@ -407,9 +494,10 @@ const columns = computed<Column[]>(() => {
           return optionsList
             .map((opt: any) => {
               if (typeof opt === 'string') {
-                return opt;
+                return stripHtmlTags(opt);
               }
-              return `${opt.label}. ${opt.content}`;
+              // 对于对象类型的选项，只显示content（因为label已经在标签中显示了）
+              return stripHtmlTags(opt.content || '');
             })
             .join(" | ");
         }
@@ -422,35 +510,57 @@ const columns = computed<Column[]>(() => {
       width: 180,
       formatter: (val, row) => {
         if (!val) return "-";
+        // 去除HTML标签
+        let cleanAnswer: string | string[] = Array.isArray(val)
+          ? val.map(v => stripHtmlTags(String(v)))
+          : stripHtmlTags(String(val));
+        
         // 多选题：显示多个答案，用顿号分隔
         if (row.questionType === "multiple" || row.type === "2") {
           // 如果是数组，直接处理
-          if (Array.isArray(val)) {
-            return val.join("、");
+          if (Array.isArray(cleanAnswer)) {
+            return cleanAnswer.join("、");
           }
           // 如果是字符串，支持多种分隔符：逗号、中文逗号、顿号、空格
-          const answers = String(val).split(/[,，、\s]+/).map(v => v.trim()).filter(v => v);
+          const answers = String(cleanAnswer).split(/[,，、\s]+/).map(v => v.trim()).filter(v => v);
           if (answers.length > 0) {
             return answers.join("、");
           }
-          return String(val);
+          return String(cleanAnswer);
         }
         // 单选题：显示单个选项字母
-        return Array.isArray(val) ? val.join("、") : String(val);
+        return Array.isArray(cleanAnswer) ? cleanAnswer.join("、") : String(cleanAnswer);
       },
     });
   } else if (selectedType.value === "4") {
-    // 填空题：显示填空答案（题目内容已在baseColumns中）
+    // 填空题：显示填空答案（题目内容已在baseColumns中），多个答案分行显示
     baseColumns.push({
       prop: "correctAnswer",
       label: "填空答案",
       minWidth: 250,
       align: "left",
       formatter: (val) => {
-        if (typeof val === "string" && val.length > 80) {
-          return val.substring(0, 80) + "...";
+        if (!val) return "-";
+        let cleanAnswer: string;
+        if (Array.isArray(val)) {
+          // 如果是数组，每个答案一行
+          cleanAnswer = val.map(v => stripHtmlTags(String(v))).join("\n");
+        } else {
+          // 如果是字符串，检查是否包含分隔符（逗号、中文逗号、顿号、分号等）
+          const answerStr = stripHtmlTags(String(val));
+          // 检查是否包含多个答案的分隔符
+          if (/[,，、;；\n]/.test(answerStr)) {
+            // 按分隔符分割，每个答案一行
+            cleanAnswer = answerStr.split(/[,，、;；\n]+/).map(v => v.trim()).filter(v => v).join("\n");
+          } else {
+            cleanAnswer = answerStr;
+          }
         }
-        return val || "-";
+        // 如果答案过长，在表格中截断显示
+        if (cleanAnswer.length > 150) {
+          return cleanAnswer.substring(0, 150) + "...";
+        }
+        return cleanAnswer;
       },
     });
   } else if (selectedType.value === "3") {
@@ -461,29 +571,39 @@ const columns = computed<Column[]>(() => {
       width: 120,
       formatter: (val) => {
         if (!val) return "-";
-        // 统一格式化为"对"或"错"
-        const answerStr = String(val).toLowerCase().trim();
+        // 去除HTML标签后再判断
+        const cleanAnswer = stripHtmlTags(String(val));
+        const answerStr = cleanAnswer.toLowerCase().trim();
         if (answerStr === "true" || answerStr === "对" || answerStr === "正确" || answerStr === "1" || answerStr === "yes") {
           return "对";
         }
         if (answerStr === "false" || answerStr === "错" || answerStr === "错误" || answerStr === "0" || answerStr === "no") {
           return "错";
         }
-        return val;
+        return cleanAnswer;
       },
     });
   } else if (selectedType.value === "8") {
-    // 计算分析题：显示子题数量
+    // 计算分析题：显示答案内容，格式为（1）答案1（2）答案2...，每个子题答案一行
     baseColumns.push({
       prop: "correctAnswer",
-      label: "子题数量",
-      width: 120,
+      label: "正确答案",
+      minWidth: 400,
+      align: "left",
       formatter: (val, row) => {
-        // 如果有子题，显示子题数量
-        if (row.options && Array.isArray(row.options) && row.options.length > 0) {
-          return `${row.options.length} 道子题`;
+        if (!val) return "-";
+        // 答案已经在 convertQuestion 中格式化为（1）答案1\n（2）答案2...的格式（使用换行符分隔）
+        // 在表格中，换行符会被渲染为换行
+        const answerStr = String(val);
+        // 如果答案过长，在表格中适当截断（保留前几行）
+        if (answerStr.length > 400) {
+          const lines = answerStr.split("\n");
+          if (lines.length > 3) {
+            return lines.slice(0, 3).join("\n") + "\n...";
+          }
+          return answerStr.substring(0, 400) + "...";
         }
-        return "-";
+        return answerStr;
       },
     });
   } else if (selectedType.value === "") {
@@ -828,6 +948,14 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   padding: 8px 0;
+}
+
+/* 多行答案样式：支持换行显示（填空题和计算分析题） */
+.multi-line-answer {
+  white-space: pre-line;
+  word-break: break-word;
+  line-height: 1.6;
+  display: block;
 }
 </style>
 
