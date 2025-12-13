@@ -58,6 +58,8 @@ declare module 'vue' {
     ElUpload: typeof import('element-plus/es')['ElUpload']
     FloatingMenu: typeof import('./../components/menu/floatingMenu.vue')['default']
     HelloWorld: typeof import('./../components/HelloWorld.vue')['default']
+    PermissionConfig: typeof import('./../components/PermissionConfig.vue')['default']
+    PermissionWrapper: typeof import('./../components/PermissionWrapper.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     StoreDemo: typeof import('./../components/StoreDemo.vue')['default']

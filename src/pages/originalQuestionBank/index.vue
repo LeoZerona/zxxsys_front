@@ -2,7 +2,7 @@
   <div class="repo-table">
     <TableToolBar
       ref="tableToolBarRef"
-      placeholder="搜索题库名称、占用空间、题目数量"
+      placeholder="搜索题型、题目数量"
       :columns="tableToolBarColumns"
       v-model:model-keyword="searchKeyword"
       v-model:model-adv-search="advSearchParams"
@@ -85,6 +85,7 @@ import { ref, onMounted, computed, watch } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import TableToolBar from "@/components/tableToolBar/index.vue";
+import { getQuestionStatistics } from "@/api/question";
 
 const router = useRouter();
 
@@ -124,6 +125,8 @@ interface RepoItem {
   createdAt: string | Date;
   storage: number;
   questionCount: number;
+  type?: string; // 题型代码
+  typeName?: string; // 题型名称
 }
 
 /** 按钮配置 */
@@ -169,8 +172,12 @@ const formatStorage = (bytes: number) => {
 
 /* ===================== 业务方法（需要在列配置之前定义） ===================== */
 function handleView(row: RepoItem) {
-  // 跳转到题库内容详情页
-  router.push({ name: "questionBankDetail", params: { id: row.id } });
+  // 跳转到题库内容详情页，传递题型参数
+  router.push({
+    name: "questionBankDetail",
+    params: { id: row.id || "1" },
+    query: { type: row.type || "" }, // 传递题型代码
+  });
 }
 
 function handleDel(row: RepoItem) {
@@ -179,6 +186,18 @@ function handleDel(row: RepoItem) {
 
 /* ===================== 列配置（按钮也在这里） ===================== */
 const columns = ref<Column[]>([
+  {
+    prop: "typeName",
+    label: "题型",
+    width: 150,
+    formatter: (val) => val || "全部题目",
+  },
+  {
+    prop: "questionCount",
+    label: "题目数量",
+    width: 120,
+    searchType: "input", // 支持输入筛选
+  },
   {
     prop: "createdAt",
     label: "创建日期",
@@ -191,12 +210,6 @@ const columns = ref<Column[]>([
     label: "占用空间",
     width: 140,
     formatter: (val) => formatStorage(val),
-    searchType: "input", // 支持输入筛选
-  },
-  {
-    prop: "questionCount",
-    label: "题目数量",
-    width: 120,
     searchType: "input", // 支持输入筛选
   },
   {
@@ -224,9 +237,7 @@ const tableToolBarColumns = computed<IColumn[]>(() => {
 
 // 列显隐状态（排除操作列）
 const checkedCols = ref<string[]>(
-  columns.value
-    .filter((col) => !col.actionButtons)
-    .map((col) => col.prop)
+  columns.value.filter((col) => !col.actionButtons).map((col) => col.prop)
 );
 
 // 监听 columns 变化，更新 checkedCols
@@ -237,8 +248,11 @@ watch(
       .filter((col) => !col.actionButtons)
       .map((col) => col.prop);
     // 只有当 checkedCols 为空或与当前列不匹配时才更新
-    if (checkedCols.value.length === 0 || 
-        JSON.stringify([...checkedCols.value].sort()) !== JSON.stringify([...dataColumns].sort())) {
+    if (
+      checkedCols.value.length === 0 ||
+      JSON.stringify([...checkedCols.value].sort()) !==
+        JSON.stringify([...dataColumns].sort())
+    ) {
       checkedCols.value = dataColumns;
     }
   },
@@ -266,16 +280,93 @@ const tableData = ref<RepoItem[]>([]);
 async function fetchData() {
   loading.value = true;
   try {
-    const res = await mockApi({
-      page: page.value,
-      pageSize: pageSize.value,
-      keyword: searchKeyword.value, // 使用关联的搜索关键词
-      ...advSearchParams.value, // 合并高级搜索参数
+    // 获取题目统计信息（按题型分组）
+    const response = await getQuestionStatistics({
+      group_by: "type",
     });
-    tableData.value = res.list;
-    total.value = res.total;
-  } catch {
-    ElMessage.error("数据加载失败");
+
+    if (response.success && response.data) {
+      // 将统计信息转换为列表格式
+      // 由于所有原题库都是同一个，我们按题型展示
+      let list: RepoItem[] = [];
+
+      if (response.data.statistics && response.data.statistics.length > 0) {
+        list = response.data.statistics.map((stat, index) => ({
+          id: index + 1,
+          createdAt: new Date(), // 统一题库，使用当前时间
+          storage: 0, // 暂不计算占用空间
+          questionCount: stat.count || 0,
+          type: stat.type || "",
+          typeName: stat.type_name || "",
+        }));
+      } else {
+        // 如果没有统计数据，创建一个默认条目
+        list = [
+          {
+            id: 1,
+            createdAt: new Date(),
+            storage: 0,
+            questionCount: response.data.total || 0,
+            type: "",
+            typeName: "全部题目",
+          },
+        ];
+      }
+
+      // 应用筛选条件
+      let filteredList = [...list];
+
+      // 关键词搜索（搜索题型名称、题目数量）
+      if (searchKeyword.value) {
+        const keyword = searchKeyword.value.toLowerCase();
+        filteredList = filteredList.filter((v) => {
+          return (
+            (v.typeName && v.typeName.toLowerCase().includes(keyword)) ||
+            v.questionCount.toString().includes(keyword)
+          );
+        });
+      }
+
+      // 高级搜索：创建日期范围
+      if (
+        advSearchParams.value.createdAt &&
+        Array.isArray(advSearchParams.value.createdAt) &&
+        advSearchParams.value.createdAt.length === 2
+      ) {
+        const [start, end] = advSearchParams.value.createdAt;
+        if (start && end) {
+          const startDate = new Date(start);
+          const endDate = new Date(end);
+          endDate.setHours(23, 59, 59, 999);
+          filteredList = filteredList.filter((v) => {
+            const date = new Date(v.createdAt);
+            return date >= startDate && date <= endDate;
+          });
+        }
+      }
+
+      // 高级搜索：题目数量
+      if (advSearchParams.value.questionCount) {
+        filteredList = filteredList.filter((v) =>
+          v.questionCount
+            .toString()
+            .includes(advSearchParams.value.questionCount!)
+        );
+      }
+
+      // 分页处理
+      const offset = (page.value - 1) * pageSize.value;
+      tableData.value = filteredList.slice(offset, offset + pageSize.value);
+      total.value = filteredList.length;
+    } else {
+      tableData.value = [];
+      total.value = 0;
+    }
+  } catch (error: any) {
+    console.error("获取题库数据失败:", error);
+    ElMessage.error(error.message || "数据加载失败");
+    tableData.value = [];
+    total.value = 0;
   } finally {
     loading.value = false;
   }
@@ -309,75 +400,6 @@ function onColumnChange(cols: string[]) {
 
 /* ===================== 生命周期 ===================== */
 onMounted(() => fetchData());
-
-
-/* ===================== Mock API ===================== */
-function mockApi(p: {
-  page: number;
-  pageSize: number;
-  keyword?: string;
-  createdAt?: string[]; // 日期范围 [start, end]
-  storage?: string; // 占用空间筛选
-  questionCount?: string; // 题目数量筛选
-}) {
-  return new Promise<{ list: RepoItem[]; total: number }>((resolve) => {
-    setTimeout(() => {
-      let all: RepoItem[] = Array.from({ length: 137 }, (_, idx) => ({
-        id: idx + 1,
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * idx),
-        storage: Math.floor(Math.random() * 1024 * 1024 * 100),
-        questionCount: Math.floor(Math.random() * 5000),
-      }));
-
-      // 普通关键词搜索（搜索 ID、占用空间、题目数量）
-      if (p.keyword) {
-        const keyword = p.keyword.toLowerCase();
-        all = all.filter((v) => {
-          return (
-            v.id.toString().includes(keyword) ||
-            formatStorage(v.storage).toLowerCase().includes(keyword) ||
-            v.questionCount.toString().includes(keyword)
-          );
-        });
-      }
-
-      // 高级搜索：创建日期范围
-      if (p.createdAt && Array.isArray(p.createdAt) && p.createdAt.length === 2) {
-        const [start, end] = p.createdAt;
-        if (start && end) {
-          const startDate = new Date(start);
-          const endDate = new Date(end);
-          endDate.setHours(23, 59, 59, 999); // 包含结束日期当天
-          all = all.filter((v) => {
-            const date = new Date(v.createdAt);
-            return date >= startDate && date <= endDate;
-          });
-        }
-      }
-
-      // 高级搜索：占用空间
-      if (p.storage) {
-        const storageStr = p.storage.toLowerCase();
-        all = all.filter((v) =>
-          formatStorage(v.storage).toLowerCase().includes(storageStr)
-        );
-      }
-
-      // 高级搜索：题目数量
-      if (p.questionCount) {
-        all = all.filter((v) =>
-          v.questionCount.toString().includes(p.questionCount!)
-        );
-      }
-
-      const offset = (p.page - 1) * p.pageSize;
-      resolve({
-        list: all.slice(offset, offset + p.pageSize),
-        total: all.length,
-      });
-    }, 300);
-  });
-}
 </script>
 
 <style lang="scss" scoped>

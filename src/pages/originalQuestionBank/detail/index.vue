@@ -124,6 +124,7 @@ import { ArrowLeft } from "@element-plus/icons-vue";
 import TableToolBar from "@/components/tableToolBar/index.vue";
 import QuestionDetailDialog from "./components/QuestionDetailDialog.vue";
 import QuestionEditDialog from "./components/QuestionEditDialog.vue";
+import { getQuestionList, type Question } from "@/api/question";
 
 // TableToolBar 列配置类型
 interface IColumn {
@@ -137,15 +138,17 @@ interface IColumn {
 interface QuestionItem {
   questionId: number | string;
   subject: string; // 科目
+  subjectId?: number; // 科目ID
   content: string;
-  questionType: "single" | "multiple" | "fill" | "shortAnswer" | "judge" | "essay";
-  difficulty: "easy" | "medium" | "hard";
-  score: number;
-  createdAt: string | Date;
-  updatedAt: string | Date;
+  questionType: "single" | "multiple" | "fill" | "shortAnswer" | "judge" | "essay" | "calc"; // calc=计算分析题
+  type?: string; // 题型代码：1=单选, 2=多选, 3=判断, 4=填空, 8=计算分析
+  difficulty?: "easy" | "medium" | "hard";
+  score?: number;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
   // 详细信息
-  options?: string[]; // 选择题选项
-  correctAnswer?: string; // 正确答案
+  options?: Array<{ label: string; content: string }> | string[]; // 选择题选项
+  correctAnswer?: string | string[]; // 正确答案
   analysis?: string; // 题目解析
   knowledgePoint?: string;
   tags?: string[];
@@ -178,6 +181,8 @@ const router = useRouter();
 const route = useRoute();
 const bankId = computed(() => route.params.id as string || route.query.id as string);
 const bankName = ref<string>("");
+// 从路由参数获取题型，如果没有则显示全部
+const routeType = computed(() => route.query.type as string || '');
 
 /* ===================== 工具函数 ===================== */
 const formatDate = (d: string | Date) => {
@@ -198,6 +203,12 @@ const formatQuestionType = (type: string) => {
     shortAnswer: "简答题",
     judge: "判断题",
     essay: "论述题",
+    calc: "计算分析题",
+    "1": "单选题",
+    "2": "多选题",
+    "3": "判断题",
+    "4": "填空题",
+    "8": "计算分析题",
   };
   return typeMap[type] || type;
 };
@@ -248,6 +259,59 @@ function handleTypeFilter(type: string) {
   fetchData();
 }
 
+// 将后端题型代码转换为前端格式
+function convertTypeCode(type: string): string {
+  const typeMap: Record<string, string> = {
+    "1": "single",
+    "2": "multiple",
+    "3": "judge",
+    "4": "fill",
+    "8": "calc",
+  };
+  return typeMap[type] || type;
+}
+
+// 将后端题目数据转换为前端格式
+function convertQuestion(question: Question): QuestionItem {
+  const typeCode = question.type;
+  const convertedType = convertTypeCode(typeCode);
+  
+  // 处理答案
+  let correctAnswer: string | string[] = "";
+  if (question.answer) {
+    if (question.answer.correct_answer) {
+      correctAnswer = question.answer.correct_answer;
+    } else if (question.answer.answer_content) {
+      correctAnswer = question.answer.answer_content;
+    } else if (question.answer.option_true) {
+      correctAnswer = question.answer.option_true;
+    }
+  }
+
+  // 处理选项
+  let options: Array<{ label: string; content: string }> | string[] = [];
+  if (question.options && question.options.length > 0) {
+    options = question.options.map(opt => ({
+      label: opt.label,
+      content: opt.content,
+    }));
+  }
+
+  return {
+    questionId: question.question_id,
+    subject: question.subject_name || "",
+    subjectId: question.subject_id,
+    content: question.content,
+    questionType: convertedType as any,
+    type: typeCode,
+    correctAnswer: correctAnswer,
+    analysis: question.analysis,
+    options: options,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+}
+
 function handleDel(row: QuestionItem) {
   ElMessage.warning(`删除题目 ID：${row.questionId}（这里调接口）`);
 }
@@ -288,15 +352,9 @@ const columns = computed<Column[]>(() => {
       width: 120,
       searchType: "select",
       options: [
-        { label: "数学", value: "math" },
-        { label: "语文", value: "chinese" },
-        { label: "英语", value: "english" },
-        { label: "物理", value: "physics" },
-        { label: "化学", value: "chemistry" },
-        { label: "生物", value: "biology" },
-        { label: "历史", value: "history" },
-        { label: "地理", value: "geography" },
-        { label: "政治", value: "politics" },
+        // 科目选项可以从API获取，这里先使用示例数据
+        { label: "会计学", value: "会计学" },
+        { label: "财务管理", value: "财务管理" },
       ],
       formatter: (val) => formatSubject(val),
     },
@@ -320,24 +378,23 @@ const columns = computed<Column[]>(() => {
   // 如果选择了特定类型，不显示题目类型列；如果选择"全部"，显示题目类型列
   if (!selectedType.value) {
     baseColumns.push({
-      prop: "questionType",
+      prop: "type",
       label: "题目类型",
       width: 120,
       searchType: "select",
       options: [
-        { label: "单选题", value: "single" },
-        { label: "多选题", value: "multiple" },
-        { label: "填空题", value: "fill" },
-        { label: "简答题", value: "shortAnswer" },
-        { label: "判断题", value: "judge" },
-        { label: "论述题", value: "essay" },
+        { label: "单选题", value: "1" },
+        { label: "多选题", value: "2" },
+        { label: "判断题", value: "3" },
+        { label: "填空题", value: "4" },
+        { label: "计算分析题", value: "8" },
       ],
       formatter: (val) => formatQuestionType(val),
     });
   }
 
   // 根据题目类型添加特定字段
-  if (selectedType.value === "single" || selectedType.value === "multiple") {
+  if (selectedType.value === "1" || selectedType.value === "2") {
     // 选择题：显示选项和正确答案
     baseColumns.push({
       prop: "options",
@@ -347,8 +404,14 @@ const columns = computed<Column[]>(() => {
       formatter: (_val, row) => {
         if (row.options && row.options.length > 0) {
           // 选项横向一排显示，用分隔符连接
-          return row.options
-            .map((opt, idx) => `${String.fromCharCode(65 + idx)}. ${opt}`)
+          const optionsList = Array.isArray(row.options) ? row.options : [];
+          return optionsList
+            .map((opt: any) => {
+              if (typeof opt === 'string') {
+                return opt;
+              }
+              return `${opt.label}. ${opt.content}`;
+            })
             .join(" | ");
         }
         return "-";
@@ -361,19 +424,23 @@ const columns = computed<Column[]>(() => {
       formatter: (val, row) => {
         if (!val) return "-";
         // 多选题：显示多个答案，用顿号分隔
-        if (row.questionType === "multiple") {
-          // 支持多种分隔符：逗号、中文逗号、顿号、空格
-          const answers = val.split(/[,，、\s]+/).map(v => v.trim()).filter(v => v);
+        if (row.questionType === "multiple" || row.type === "2") {
+          // 如果是数组，直接处理
+          if (Array.isArray(val)) {
+            return val.join("、");
+          }
+          // 如果是字符串，支持多种分隔符：逗号、中文逗号、顿号、空格
+          const answers = String(val).split(/[,，、\s]+/).map(v => v.trim()).filter(v => v);
           if (answers.length > 0) {
             return answers.join("、");
           }
-          return val;
+          return String(val);
         }
         // 单选题：显示单个选项字母
-        return val;
+        return Array.isArray(val) ? val.join("、") : String(val);
       },
     });
-  } else if (selectedType.value === "fill") {
+  } else if (selectedType.value === "4") {
     // 填空题：显示填空答案（题目内容已在baseColumns中）
     baseColumns.push({
       prop: "correctAnswer",
@@ -387,7 +454,7 @@ const columns = computed<Column[]>(() => {
         return val || "-";
       },
     });
-  } else if (selectedType.value === "judge") {
+  } else if (selectedType.value === "3") {
     // 判断题：显示正确答案（对/错），明确显示
     baseColumns.push({
       prop: "correctAnswer",
@@ -406,7 +473,21 @@ const columns = computed<Column[]>(() => {
         return val;
       },
     });
-  } else if (selectedType.value === "shortAnswer" || selectedType.value === "essay") {
+  } else if (selectedType.value === "8") {
+    // 计算分析题：显示子题数量
+    baseColumns.push({
+      prop: "correctAnswer",
+      label: "子题数量",
+      width: 120,
+      formatter: (val, row) => {
+        // 如果有子题，显示子题数量
+        if (row.options && Array.isArray(row.options) && row.options.length > 0) {
+          return `${row.options.length} 道子题`;
+        }
+        return "-";
+      },
+    });
+  } else if (selectedType.value === "") {
     // 简答题/论述题：显示参考答案
     baseColumns.push({
       prop: "correctAnswer",
@@ -431,7 +512,7 @@ const columns = computed<Column[]>(() => {
       formatter: (val, row) => {
         if (!val) return "-";
         // 根据题目类型格式化答案
-        if (row.questionType === "judge") {
+        if (row.questionType === "judge" || row.type === "3") {
           const answerStr = String(val).toLowerCase().trim();
           if (answerStr === "true" || answerStr === "对" || answerStr === "正确" || answerStr === "1" || answerStr === "yes") {
             return "对";
@@ -439,7 +520,7 @@ const columns = computed<Column[]>(() => {
           if (answerStr === "false" || answerStr === "错" || answerStr === "错误" || answerStr === "0" || answerStr === "no") {
             return "错";
           }
-        } else if (row.questionType === "multiple") {
+        } else if (row.questionType === "multiple" || row.type === "2") {
           const answers = val.split(/[,，、\s]+/).map(v => v.trim()).filter(v => v);
           if (answers.length > 0) {
             return answers.join("、");
@@ -502,18 +583,17 @@ const columns = computed<Column[]>(() => {
   return baseColumns;
 });
 
-// 题目类型选项
+// 题目类型选项（使用后端题型代码）
 const questionTypes = [
   { label: "全部", value: "" },
-  { label: "单选题", value: "single" },
-  { label: "多选题", value: "multiple" },
-  { label: "填空题", value: "fill" },
-  { label: "简答题", value: "shortAnswer" },
-  { label: "判断题", value: "judge" },
-  { label: "论述题", value: "essay" },
+  { label: "单选题", value: "1" },
+  { label: "多选题", value: "2" },
+  { label: "判断题", value: "3" },
+  { label: "填空题", value: "4" },
+  { label: "计算分析题", value: "8" },
 ];
 
-const selectedType = ref<string>("");
+const selectedType = ref<string>(routeType.value || "");
 
 // 将表格列配置转换为 TableToolBar 需要的格式（排除操作列）
 const tableToolBarColumns = computed<IColumn[]>(() => {
@@ -617,151 +697,79 @@ function handleReset() {
 
 /* ===================== 数据获取 ===================== */
 async function fetchData() {
-  if (!bankId.value) {
-    ElMessage.error("题库ID不存在");
+  // 如果没有选择题型，不能调用接口（type是必填参数）
+  if (!selectedType.value) {
+    // 显示全部时，可以显示提示或加载所有题型的数据
+    // 这里我们默认加载单选题作为示例，或者可以提示用户选择题型
+    if (tableData.value.length === 0) {
+      ElMessage.info("请选择题目类型");
+    }
     return;
   }
 
   loading.value = true;
   try {
-    const res = await mockApi({
-      bankId: bankId.value,
+    // 构建查询参数
+    const params: any = {
+      type: selectedType.value, // 必填参数
       page: page.value,
-      pageSize: pageSize.value,
-      keyword: searchKeyword.value,
-      questionType: selectedType.value || undefined, // 如果选择了类型，传递筛选条件
-      ...advSearchParams.value,
-    });
-    tableData.value = res.list;
-    total.value = res.total;
-  } catch {
-    ElMessage.error("数据加载失败");
+      page_size: pageSize.value,
+      include_answer: true,
+      include_analysis: true,
+    };
+
+    // 添加高级搜索参数
+    if (searchKeyword.value) {
+      // 如果关键词搜索，可以通过科目名称或其他字段搜索
+      // 这里简化处理，实际可以根据后端支持的搜索字段调整
+    }
+
+    if (advSearchParams.value.subject) {
+      params.subject_name = advSearchParams.value.subject;
+    }
+
+    if (advSearchParams.value.subject_id) {
+      params.subject_id = advSearchParams.value.subject_id;
+    }
+
+    if (advSearchParams.value.chapter_id) {
+      params.chapter_id = advSearchParams.value.chapter_id;
+    }
+
+    // 调用API获取题目列表
+    const response = await getQuestionList(params);
+
+    if (response.success && response.data) {
+      // 转换数据格式
+      tableData.value = response.data.list.map(convertQuestion);
+      total.value = response.data.pagination.total;
+    } else {
+      tableData.value = [];
+      total.value = 0;
+    }
+  } catch (error: any) {
+    console.error('获取题目列表失败:', error);
+    ElMessage.error(error.message || "数据加载失败");
+    tableData.value = [];
+    total.value = 0;
   } finally {
     loading.value = false;
   }
 }
 
-/* ===================== Mock API ===================== */
-function mockApi(p: {
-  bankId: string;
-  page: number;
-  pageSize: number;
-  keyword?: string;
-  subject?: string;
-  questionType?: string;
-  difficulty?: string;
-  score?: string;
-  createdAt?: string[];
-  updatedAt?: string[];
-}) {
-  return new Promise<{ list: QuestionItem[]; total: number }>((resolve) => {
-    setTimeout(() => {
-      // 生成模拟数据
-      const questionTypes: QuestionItem["questionType"][] = [
-        "single",
-        "multiple",
-        "fill",
-        "shortAnswer",
-        "judge",
-        "essay",
-      ];
-      const difficulties: QuestionItem["difficulty"][] = ["easy", "medium", "hard"];
-
-      const subjects = ["math", "chinese", "english", "physics", "chemistry", "biology", "history", "geography", "politics"];
-      
-      let all: QuestionItem[] = Array.from({ length: 156 }, (_, idx) => {
-        const type = questionTypes[idx % questionTypes.length];
-        const isChoice = type === "single" || type === "multiple";
-        return {
-          questionId: idx + 1,
-          subject: subjects[idx % subjects.length],
-          content: `这是第 ${idx + 1} 道题目的内容。题目可能包含多个选项，需要仔细分析。${idx % 3 === 0 ? "这是一道比较复杂的题目，需要综合运用多个知识点来解答。" : ""}`,
-          questionType: type,
-          difficulty: difficulties[idx % difficulties.length],
-          score: [5, 10, 15, 20][idx % 4],
-          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * idx),
-          updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * (idx - 1)),
-          // 详细信息
-          options: isChoice ? ["选项A", "选项B", "选项C", "选项D"] : undefined,
-          correctAnswer: isChoice ? (type === "single" ? "A" : "A,B") : "这是正确答案",
-          analysis: `这是第 ${idx + 1} 道题目的解析内容，帮助理解题目的解题思路。`,
-          knowledgePoint: `知识点${Math.floor(idx / 10) + 1}`,
-          tags: [`标签${idx % 5 + 1}`, `标签${(idx + 1) % 5 + 1}`],
-          usageCount: Math.floor(Math.random() * 100),
-          correctRate: Math.floor(Math.random() * 100),
-          status: idx % 10 === 0 ? "inactive" : "active",
-        };
-      });
-
-      // 普通关键词搜索（搜索题目内容）
-      if (p.keyword) {
-        const keyword = p.keyword.toLowerCase();
-        all = all.filter((v) => v.content.toLowerCase().includes(keyword));
-      }
-
-      // 高级搜索：科目
-      if (p.subject) {
-        all = all.filter((v) => v.subject === p.subject);
-      }
-
-      // 高级搜索：题目类型
-      if (p.questionType) {
-        all = all.filter((v) => v.questionType === p.questionType);
-      }
-
-      // 高级搜索：难度等级
-      if (p.difficulty) {
-        all = all.filter((v) => v.difficulty === p.difficulty);
-      }
-
-      // 高级搜索：分值
-      if (p.score) {
-        all = all.filter((v) => v.score.toString().includes(p.score!));
-      }
-
-      // 高级搜索：创建时间范围
-      if (p.createdAt && Array.isArray(p.createdAt) && p.createdAt.length === 2) {
-        const [start, end] = p.createdAt;
-        if (start && end) {
-          const startDate = new Date(start);
-          const endDate = new Date(end);
-          endDate.setHours(23, 59, 59, 999);
-          all = all.filter((v) => {
-            const date = new Date(v.createdAt);
-            return date >= startDate && date <= endDate;
-          });
-        }
-      }
-
-      // 高级搜索：更新时间范围
-      if (p.updatedAt && Array.isArray(p.updatedAt) && p.updatedAt.length === 2) {
-        const [start, end] = p.updatedAt;
-        if (start && end) {
-          const startDate = new Date(start);
-          const endDate = new Date(end);
-          endDate.setHours(23, 59, 59, 999);
-          all = all.filter((v) => {
-            const date = new Date(v.updatedAt);
-            return date >= startDate && date <= endDate;
-          });
-        }
-      }
-
-      const offset = (p.page - 1) * p.pageSize;
-      resolve({
-        list: all.slice(offset, offset + p.pageSize),
-        total: all.length,
-      });
-    }, 300);
-  });
-}
 
 /* ===================== 生命周期 ===================== */
 onMounted(() => {
   // 获取题库名称（可以从路由参数或API获取）
   bankName.value = `题库 ${bankId.value}`;
-  // 加载数据
-  fetchData();
+  
+  // 如果从路由参数获取到了题型，自动加载数据
+  if (selectedType.value) {
+    fetchData();
+  } else {
+    // 如果没有题型，提示用户选择题型
+    ElMessage.info("请选择题型查看题目");
+  }
 });
 </script>
 
