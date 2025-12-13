@@ -2,7 +2,7 @@
   <div class="repo-table">
     <TableToolBar
       ref="tableToolBarRef"
-      placeholder="搜索题型、题目数量"
+      placeholder="搜索题库名称、占用空间、题目数量"
       :columns="tableToolBarColumns"
       v-model:model-keyword="searchKeyword"
       v-model:model-adv-search="advSearchParams"
@@ -122,11 +122,10 @@ function onExport() {
 /* ===================== 类型 ===================== */
 interface RepoItem {
   id: number;
+  name: string; // 题库名称
   createdAt: string | Date;
   storage: number;
   questionCount: number;
-  type?: string; // 题型代码
-  typeName?: string; // 题型名称
 }
 
 /** 按钮配置 */
@@ -172,11 +171,11 @@ const formatStorage = (bytes: number) => {
 
 /* ===================== 业务方法（需要在列配置之前定义） ===================== */
 function handleView(row: RepoItem) {
-  // 跳转到题库内容详情页，传递题型参数
+  // 跳转到题库内容详情页
+  // 注意：虽然传递了题库ID，但后端暂时不区分，所有题库都返回相同数据
   router.push({
     name: "questionBankDetail",
     params: { id: row.id || "1" },
-    query: { type: row.type || "" }, // 传递题型代码
   });
 }
 
@@ -187,15 +186,9 @@ function handleDel(row: RepoItem) {
 /* ===================== 列配置（按钮也在这里） ===================== */
 const columns = ref<Column[]>([
   {
-    prop: "typeName",
-    label: "题型",
-    width: 150,
-    formatter: (val) => val || "全部题目",
-  },
-  {
-    prop: "questionCount",
-    label: "题目数量",
-    width: 120,
+    prop: "name",
+    label: "题库名称",
+    minWidth: 200,
     searchType: "input", // 支持输入筛选
   },
   {
@@ -210,6 +203,12 @@ const columns = ref<Column[]>([
     label: "占用空间",
     width: 140,
     formatter: (val) => formatStorage(val),
+    searchType: "input", // 支持输入筛选
+  },
+  {
+    prop: "questionCount",
+    label: "题目数量",
+    width: 120,
     searchType: "input", // 支持输入筛选
   },
   {
@@ -280,48 +279,63 @@ const tableData = ref<RepoItem[]>([]);
 async function fetchData() {
   loading.value = true;
   try {
-    // 获取题目统计信息（按题型分组）
-    const response = await getQuestionStatistics({
-      group_by: "type",
-    });
+    // 获取题目统计信息（获取总数，用于所有题库）
+    const response = await getQuestionStatistics({});
 
     if (response.success && response.data) {
-      // 将统计信息转换为列表格式
-      // 由于所有原题库都是同一个，我们按题型展示
-      let list: RepoItem[] = [];
-
-      if (response.data.statistics && response.data.statistics.length > 0) {
-        list = response.data.statistics.map((stat, index) => ({
-          id: index + 1,
-          createdAt: new Date(), // 统一题库，使用当前时间
-          storage: 0, // 暂不计算占用空间
-          questionCount: stat.count || 0,
-          type: stat.type || "",
-          typeName: stat.type_name || "",
-        }));
-      } else {
-        // 如果没有统计数据，创建一个默认条目
-        list = [
-          {
-            id: 1,
-            createdAt: new Date(),
-            storage: 0,
-            questionCount: response.data.total || 0,
-            type: "",
-            typeName: "全部题目",
-          },
-        ];
-      }
+      // 生成多个题库条目（模拟数据）
+      // 所有题库使用相同的题目总数（因为后端暂时不区分不同题库）
+      const totalCount = response.data.total || 0;
+      
+      // 生成题库列表（这里可以后续改为从API获取真实题库列表）
+      let allRepos: RepoItem[] = [
+        {
+          id: 1,
+          name: "原题库1",
+          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30),
+          storage: Math.floor(Math.random() * 1024 * 1024 * 100),
+          questionCount: totalCount, // 使用统计接口获取的总数
+        },
+        {
+          id: 2,
+          name: "原题库2",
+          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 25),
+          storage: Math.floor(Math.random() * 1024 * 1024 * 100),
+          questionCount: totalCount, // 使用统计接口获取的总数
+        },
+        {
+          id: 3,
+          name: "原题库3",
+          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 20),
+          storage: Math.floor(Math.random() * 1024 * 1024 * 100),
+          questionCount: totalCount, // 使用统计接口获取的总数
+        },
+        {
+          id: 4,
+          name: "原题库4",
+          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 15),
+          storage: Math.floor(Math.random() * 1024 * 1024 * 100),
+          questionCount: totalCount, // 使用统计接口获取的总数
+        },
+        {
+          id: 5,
+          name: "原题库5",
+          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10),
+          storage: Math.floor(Math.random() * 1024 * 1024 * 100),
+          questionCount: totalCount, // 使用统计接口获取的总数
+        },
+      ];
 
       // 应用筛选条件
-      let filteredList = [...list];
+      let filteredList = [...allRepos];
 
-      // 关键词搜索（搜索题型名称、题目数量）
+      // 关键词搜索（搜索题库名称、占用空间、题目数量）
       if (searchKeyword.value) {
         const keyword = searchKeyword.value.toLowerCase();
         filteredList = filteredList.filter((v) => {
           return (
-            (v.typeName && v.typeName.toLowerCase().includes(keyword)) ||
+            v.name.toLowerCase().includes(keyword) ||
+            formatStorage(v.storage).toLowerCase().includes(keyword) ||
             v.questionCount.toString().includes(keyword)
           );
         });
@@ -345,12 +359,18 @@ async function fetchData() {
         }
       }
 
+      // 高级搜索：占用空间
+      if (advSearchParams.value.storage) {
+        const storageStr = advSearchParams.value.storage.toLowerCase();
+        filteredList = filteredList.filter((v) =>
+          formatStorage(v.storage).toLowerCase().includes(storageStr)
+        );
+      }
+
       // 高级搜索：题目数量
       if (advSearchParams.value.questionCount) {
         filteredList = filteredList.filter((v) =>
-          v.questionCount
-            .toString()
-            .includes(advSearchParams.value.questionCount!)
+          v.questionCount.toString().includes(advSearchParams.value.questionCount!)
         );
       }
 

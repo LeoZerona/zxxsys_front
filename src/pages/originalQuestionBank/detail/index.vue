@@ -181,8 +181,7 @@ const router = useRouter();
 const route = useRoute();
 const bankId = computed(() => route.params.id as string || route.query.id as string);
 const bankName = ref<string>("");
-// 从路由参数获取题型，如果没有则显示全部
-const routeType = computed(() => route.query.type as string || '');
+// 注意：虽然从路由获取了题库ID，但后端暂时不区分，所有题库都返回相同数据
 
 /* ===================== 工具函数 ===================== */
 const formatDate = (d: string | Date) => {
@@ -584,8 +583,8 @@ const columns = computed<Column[]>(() => {
 });
 
 // 题目类型选项（使用后端题型代码）
+// 注意：暂时禁用"全部"选项，只显示具体题型
 const questionTypes = [
-  { label: "全部", value: "" },
   { label: "单选题", value: "1" },
   { label: "多选题", value: "2" },
   { label: "判断题", value: "3" },
@@ -593,7 +592,8 @@ const questionTypes = [
   { label: "计算分析题", value: "8" },
 ];
 
-const selectedType = ref<string>(routeType.value || "");
+// 默认选择第一个类型（单选题）
+const selectedType = ref<string>("1");
 
 // 将表格列配置转换为 TableToolBar 需要的格式（排除操作列）
 const tableToolBarColumns = computed<IColumn[]>(() => {
@@ -690,7 +690,7 @@ function onColumnChange(cols: string[]) {
 function handleReset() {
   searchKeyword.value = "";
   advSearchParams.value = {};
-  selectedType.value = ""; // 重置题目类型筛选
+  selectedType.value = "1"; // 重置为默认类型（单选题）
   page.value = 1;
   fetchData();
 }
@@ -699,11 +699,7 @@ function handleReset() {
 async function fetchData() {
   // 如果没有选择题型，不能调用接口（type是必填参数）
   if (!selectedType.value) {
-    // 显示全部时，可以显示提示或加载所有题型的数据
-    // 这里我们默认加载单选题作为示例，或者可以提示用户选择题型
-    if (tableData.value.length === 0) {
-      ElMessage.info("请选择题目类型");
-    }
+    ElMessage.warning("请选择题目类型");
     return;
   }
 
@@ -762,14 +758,9 @@ async function fetchData() {
 onMounted(() => {
   // 获取题库名称（可以从路由参数或API获取）
   bankName.value = `题库 ${bankId.value}`;
-  
-  // 如果从路由参数获取到了题型，自动加载数据
-  if (selectedType.value) {
-    fetchData();
-  } else {
-    // 如果没有题型，提示用户选择题型
-    ElMessage.info("请选择题型查看题目");
-  }
+  // 注意：虽然显示了题库ID，但后端暂时不区分，所有题库都返回相同数据
+  // 默认选择第一个类型（单选题），并自动加载数据
+  fetchData();
 });
 </script>
 
