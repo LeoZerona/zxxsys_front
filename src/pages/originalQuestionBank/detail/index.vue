@@ -834,10 +834,15 @@ async function fetchData() {
       include_analysis: true,
     };
 
+    // 添加搜索关键字参数（搜索题目内容）
+    if (searchKeyword.value && searchKeyword.value.trim()) {
+      params.keyword = searchKeyword.value.trim();
+    }
+
     // 添加高级搜索参数
-    if (searchKeyword.value) {
-      // 如果关键词搜索，可以通过科目名称或其他字段搜索
-      // 这里简化处理，实际可以根据后端支持的搜索字段调整
+    // 高级搜索中的题目内容字段
+    if (advSearchParams.value.content && advSearchParams.value.content.trim()) {
+      params.keyword = advSearchParams.value.content.trim();
     }
 
     if (advSearchParams.value.subject) {
@@ -850,6 +855,22 @@ async function fetchData() {
 
     if (advSearchParams.value.chapter_id) {
       params.chapter_id = advSearchParams.value.chapter_id;
+    }
+
+    // 高级搜索：题目类型
+    if (advSearchParams.value.type) {
+      // 注意：如果高级搜索中选择了题目类型，会覆盖 selectedType
+      // 这里可以根据实际需求决定是否允许覆盖
+    }
+
+    // 高级搜索：难度等级
+    if (advSearchParams.value.difficulty) {
+      params.difficulty = advSearchParams.value.difficulty;
+    }
+
+    // 高级搜索：分值
+    if (advSearchParams.value.score) {
+      params.score = advSearchParams.value.score;
     }
 
     // 调用API获取题目列表

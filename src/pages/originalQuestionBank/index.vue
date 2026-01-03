@@ -341,6 +341,16 @@ async function fetchData() {
         });
       }
 
+      // 高级搜索：题库名称
+      if (advSearchParams.value.name) {
+        const nameStr = advSearchParams.value.name.toLowerCase().trim();
+        if (nameStr) {
+          filteredList = filteredList.filter((v) =>
+            v.name.toLowerCase().includes(nameStr)
+          );
+        }
+      }
+
       // 高级搜索：创建日期范围
       if (
         advSearchParams.value.createdAt &&
@@ -361,17 +371,22 @@ async function fetchData() {
 
       // 高级搜索：占用空间
       if (advSearchParams.value.storage) {
-        const storageStr = advSearchParams.value.storage.toLowerCase();
-        filteredList = filteredList.filter((v) =>
-          formatStorage(v.storage).toLowerCase().includes(storageStr)
-        );
+        const storageStr = advSearchParams.value.storage.toLowerCase().trim();
+        if (storageStr) {
+          filteredList = filteredList.filter((v) =>
+            formatStorage(v.storage).toLowerCase().includes(storageStr)
+          );
+        }
       }
 
       // 高级搜索：题目数量
       if (advSearchParams.value.questionCount) {
-        filteredList = filteredList.filter((v) =>
-          v.questionCount.toString().includes(advSearchParams.value.questionCount!)
-        );
+        const questionCountStr = String(advSearchParams.value.questionCount).trim();
+        if (questionCountStr) {
+          filteredList = filteredList.filter((v) =>
+            v.questionCount.toString().includes(questionCountStr)
+          );
+        }
       }
 
       // 分页处理

@@ -55,6 +55,9 @@ export interface QuestionListParams {
   subject_name?: string
   chapter_id?: number
   attr?: string
+  keyword?: string // 搜索关键字（用于搜索题目内容）
+  difficulty?: string // 难度等级
+  score?: string | number // 分值
   page?: number
   page_size?: number
   include_answer?: boolean

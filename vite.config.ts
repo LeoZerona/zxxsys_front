@@ -8,9 +8,9 @@ import { ElementPlusResolver } from "unplugin-vue-components/resolvers";
 export default defineConfig(({ mode }) => {
   // 加载环境变量
   const env = loadEnv(mode, process.cwd());
-  
+
   // 获取 API 目标地址，如果没有配置则使用默认值
-  const apiTarget = env.VITE_API_TARGET || 'http://192.168.0.101:5000';
+  const apiTarget = env.VITE_API_TARGET || "http://192.168.0.104:5000";
 
   return {
     plugins: [
@@ -37,7 +37,7 @@ export default defineConfig(({ mode }) => {
     server: {
       proxy: {
         // 代理所有以 /api 开头的请求
-        '/api': {
+        "/api": {
           target: apiTarget, // 从环境变量读取后端服务地址
           changeOrigin: true, // 改变请求头中的 origin
           secure: false, // 如果是 https 接口，需要配置这个参数
