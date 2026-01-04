@@ -87,6 +87,15 @@ const router = createRouter({
             requiresAuth: true,
           },
         },
+        {
+          path: "dedupTaskDetail/:id", // 去重任务详情页
+          name: "dedupTaskDetail",
+          component: () => import("@/pages/cleaningWarehouse/detail/index.vue"),
+          props: true,
+          meta: {
+            requiresAuth: true,
+          },
+        },
       ],
     },
     {

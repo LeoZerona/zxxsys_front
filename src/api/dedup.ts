@@ -28,6 +28,8 @@ export interface DedupTask {
   exact_duplicate_pairs: number;
   similar_duplicate_pairs: number;
   progress_percentage: number;
+  analysis_type?: string; // 分析类型，默认 'full'
+  estimated_duration?: number; // 预估时长（秒）
   started_at?: string | null;
   completed_at?: string | null;
   error_message?: string | null;
@@ -141,6 +143,7 @@ export interface GetTasksParams {
 // 创建任务参数
 export interface CreateTaskParams {
   task_name?: string;
+  analysis_type?: string; // 分析类型，默认 'full'
   config?: TaskConfig;
 }
 
@@ -237,6 +240,7 @@ export async function createDedupTask(
   try {
     const response = await request.post<TaskDetailResponse>("/dedup/tasks", {
       task_name: params?.task_name,
+      analysis_type: params?.analysis_type,
       config: params?.config,
     });
     return response as unknown as TaskDetailResponse;
