@@ -50,10 +50,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onBeforeUnmount, nextTick } from "vue";
+import { ref, watch, onMounted, onBeforeUnmount, nextTick, provide } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useUserStore } from "@/stores/modules/user";
-import { ElMessageBox } from "element-plus";
+import { ElMessageBox, ElMessage } from "element-plus";
 import rightMenu from "./components/leftMenu/index.vue";
 // import rightMenu from "./components/rightMenu.vue";
 import type { MenuItem } from "./components/leftMenu/components/RecurseMenu.vue";
@@ -122,7 +122,8 @@ const menuTitleMap: Record<string, string> = {
 };
 
 const menuList = ref<ContextMenuType[]>([
-  { key: "closeOther", label: "关闭其他", icon: "CircleClose" },
+  { key: "refresh", label: "刷新", icon: "Refresh" },
+  { key: "closeOther", label: "关闭其他", icon: "CircleClose", divided: true },
   { key: "closeLeft", label: "关闭左侧" },
   { key: "closeAll", label: "关闭所有", disabled: false, divided: true },
 ]);
@@ -328,6 +329,43 @@ const handleTabClick = (tab: { name: string; title: string }) => {
   }
 };
 const handleTabClose = (name: any) => closeTab(name);
+// 页面刷新函数注册表
+const pageRefreshHandlers = ref<Map<string, () => void | Promise<void>>>(new Map());
+
+// 提供刷新函数注册方法给子组件
+function registerPageRefresh(routeName: string, refreshFn: () => void | Promise<void>) {
+  pageRefreshHandlers.value.set(routeName, refreshFn);
+}
+
+// 提供取消注册方法
+function unregisterPageRefresh(routeName: string) {
+  pageRefreshHandlers.value.delete(routeName);
+}
+
+// 提供刷新功能给子组件
+provide("registerPageRefresh", registerPageRefresh);
+provide("unregisterPageRefresh", unregisterPageRefresh);
+
+// 执行页面刷新
+async function refreshCurrentPage() {
+  const currentRouteName = route.name as string;
+  const refreshHandler = pageRefreshHandlers.value.get(currentRouteName);
+  
+  if (refreshHandler) {
+    try {
+      await refreshHandler();
+      ElMessage.success("刷新成功");
+    } catch (error: any) {
+      console.error("页面刷新失败:", error);
+      ElMessage.error(error.message || "刷新失败");
+    }
+  } else {
+    // 如果没有注册刷新函数，使用路由刷新
+    ElMessage.info("正在刷新页面...");
+    router.go(0);
+  }
+}
+
 const onMenuClick = (key: string, tab?: { name: string; title: string }) => {
   const currentTabName = tab?.name || activeTab.value;
   const currentTabTitle = tab?.title || menuTitleMap[currentTabName] || "";
@@ -337,6 +375,10 @@ const onMenuClick = (key: string, tab?: { name: string; title: string }) => {
   );
 
   switch (key) {
+    case "refresh":
+      // 刷新当前页面
+      refreshCurrentPage();
+      break;
     case "closeOther":
       // 关闭其他标签，只保留当前标签
       visitedTabs.value = [currentTab];
@@ -510,6 +552,8 @@ onBeforeUnmount(() => {
   if (resizeTimer) {
     clearTimeout(resizeTimer);
   }
+  // 清理刷新函数注册表
+  pageRefreshHandlers.value.clear();
 });
 </script>
 

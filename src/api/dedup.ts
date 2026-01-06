@@ -7,6 +7,7 @@ import type { ApiResponse } from "./auth";
 export type TaskStatus =
   | "pending"
   | "running"
+  | "paused"
   | "completed"
   | "error"
   | "cancelled";
@@ -304,6 +305,38 @@ export async function cancelDedupTask(
   try {
     const response = await request.post<TaskDetailResponse>(
       `/dedup/tasks/${taskId}/cancel`
+    );
+    return response as unknown as TaskDetailResponse;
+  } catch (error: any) {
+    throw error;
+  }
+}
+
+/**
+ * 暂停任务
+ */
+export async function pauseDedupTask(
+  taskId: number
+): Promise<TaskDetailResponse> {
+  try {
+    const response = await request.post<TaskDetailResponse>(
+      `/dedup/tasks/${taskId}/pause`
+    );
+    return response as unknown as TaskDetailResponse;
+  } catch (error: any) {
+    throw error;
+  }
+}
+
+/**
+ * 继续任务
+ */
+export async function resumeDedupTask(
+  taskId: number
+): Promise<TaskDetailResponse> {
+  try {
+    const response = await request.post<TaskDetailResponse>(
+      `/dedup/tasks/${taskId}/resume`
     );
     return response as unknown as TaskDetailResponse;
   } catch (error: any) {

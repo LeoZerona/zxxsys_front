@@ -55,7 +55,7 @@
           <!-- 操作列 -->
           <div v-else class="action-group">
             <el-button
-              v-for="btn in col.actionButtons"
+              v-for="btn in typeof col.actionButtons === 'function' ? col.actionButtons(row) : col.actionButtons"
               :key="btn.text"
               link
               :type="btn.type || 'primary'"
@@ -139,12 +139,16 @@ import { ref, onMounted, onUnmounted, computed, watch } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage, ElMessageBox } from "element-plus";
 import TableToolBar from "@/components/tableToolBar/index.vue";
+import { usePageRefresh } from "@/utils/usePageRefresh";
+import { useLoading } from "@/utils/useLoading";
 import {
   getDedupTasks,
   createDedupTask,
   deleteDedupTask,
   startDedupTask,
   cancelDedupTask,
+  pauseDedupTask,
+  resumeDedupTask,
   type DedupTask,
   type TaskStatus,
 } from "@/api/dedup";
@@ -185,7 +189,7 @@ interface Column {
   align?: "left" | "center" | "right";
   fixed?: "left" | "right";
   formatter?: (val: any, row: DedupTask) => string;
-  actionButtons?: ActionButton[];
+  actionButtons?: ActionButton[] | ((row: DedupTask) => ActionButton[]);
   searchType?: "input" | "select" | "date" | "dateRange";
   options?: { label: string; value: string | number }[];
 }
@@ -204,8 +208,9 @@ const formatDate = (d: string | Date | null | undefined) => {
 
 const formatStatus = (status: TaskStatus) => {
   const statusMap: Record<TaskStatus, { text: string; type: string }> = {
-    pending: { text: "待处理", type: "info" },
+    pending: { text: "待启动", type: "info" },
     running: { text: "运行中", type: "warning" },
+    paused: { text: "已暂停", type: "warning" },
     completed: { text: "已完成", type: "success" },
     error: { text: "错误", type: "danger" },
     cancelled: { text: "已取消", type: "info" },
@@ -213,7 +218,10 @@ const formatStatus = (status: TaskStatus) => {
   return statusMap[status] || { text: status, type: "info" };
 };
 
-const formatProgress = (percentage: number) => {
+const formatProgress = (percentage: number | null | undefined) => {
+  if (percentage == null || isNaN(percentage)) {
+    return "-";
+  }
   return `${percentage.toFixed(1)}%`;
 };
 
@@ -259,6 +267,87 @@ async function handleCancel(row: DedupTask) {
   } catch (error: any) {
     if (error !== "cancel") {
       ElMessage.error(error.message || "取消任务失败");
+    }
+  }
+}
+
+async function handlePause(row: DedupTask) {
+  try {
+    await ElMessageBox.confirm("确定要暂停此任务吗？", "提示", {
+      confirmButtonText: "确定",
+      cancelButtonText: "取消",
+      type: "warning",
+    });
+    const result = await pauseDedupTask(row.id);
+    ElMessage.success("任务已暂停");
+    
+    // 更新任务状态
+    if (result.data) {
+      const taskIndex = tableData.value.findIndex((task) => task.id === row.id);
+      if (taskIndex !== -1) {
+        tableData.value[taskIndex] = { ...result.data };
+      }
+    }
+    
+    fetchData();
+  } catch (error: any) {
+    if (error !== "cancel") {
+      // 检查是否是数据库错误
+      const errorMessage = error.message || "";
+      if (
+        errorMessage.includes("Data truncated") ||
+        errorMessage.includes("status") ||
+        errorMessage.includes("pymysql")
+      ) {
+        ElMessage.error(
+          "暂停任务失败：数据库字段不支持 'paused' 状态。请联系后端开发人员更新数据库 schema，在 status 字段中添加 'paused' 状态。"
+        );
+        console.error("数据库错误详情:", error);
+      } else {
+        ElMessage.error(errorMessage || "暂停任务失败");
+      }
+    }
+  }
+}
+
+async function handleResume(row: DedupTask) {
+  try {
+    await ElMessageBox.confirm("确定要继续此任务吗？", "提示", {
+      confirmButtonText: "确定",
+      cancelButtonText: "取消",
+      type: "warning",
+    });
+    const result = await resumeDedupTask(row.id);
+    ElMessage.success("任务已恢复运行");
+    
+    // 更新任务状态
+    if (result.data) {
+      const taskIndex = tableData.value.findIndex((task) => task.id === row.id);
+      if (taskIndex !== -1) {
+        tableData.value[taskIndex] = { ...result.data };
+      }
+    }
+    
+    // 加入该任务的 WebSocket 房间以接收实时进度
+    socketManager.joinTask(row.id);
+    
+    fetchData();
+  } catch (error: any) {
+    if (error !== "cancel") {
+      // 检查是否是数据库错误
+      const errorMessage = error.message || "";
+      if (
+        errorMessage.includes("Data truncated") ||
+        errorMessage.includes("status") ||
+        errorMessage.includes("pymysql")
+      ) {
+        ElMessage.error(
+          "恢复任务失败：数据库字段不支持 'paused' 状态。请联系后端开发人员更新数据库 schema，在 status 字段中添加 'paused' 状态。"
+        );
+        console.error("数据库错误详情:", error);
+      } else {
+        ElMessage.error(errorMessage || "恢复任务失败");
+      }
     }
   }
 }
@@ -359,31 +448,74 @@ const columns = ref<Column[]>([
     label: "操作",
     minWidth: 280,
     fixed: "right",
-    actionButtons: [
-      {
-        text: "查看详情",
-        type: "primary",
-        click: handleViewDetail,
-      },
-      {
-        text: "启动",
-        type: "success",
-        disabled: (row) => row.status !== "pending",
-        click: handleStart,
-      },
-      {
-        text: "取消",
-        type: "warning",
-        disabled: (row) => row.status !== "running",
-        click: handleCancel,
-      },
-      {
-        text: "删除",
-        type: "danger",
-        disabled: (row) => row.status === "running",
-        click: handleDelete,
-      },
-    ],
+    actionButtons: (row: DedupTask) => {
+      const buttons: ActionButton[] = [
+        {
+          text: "查看详情",
+          type: "primary",
+          click: handleViewDetail,
+        },
+      ];
+
+      // 根据任务状态添加不同的操作按钮
+      if (row.status === "pending") {
+        // 待启动任务：启动，删除
+        buttons.push(
+          {
+            text: "启动",
+            type: "success",
+            click: handleStart,
+          },
+          {
+            text: "删除",
+            type: "danger",
+            click: handleDelete,
+          }
+        );
+      } else if (row.status === "running") {
+        // 正在运行的任务：暂停，删除
+        buttons.push(
+          {
+            text: "暂停",
+            type: "warning",
+            click: handlePause,
+          },
+          {
+            text: "删除",
+            type: "danger",
+            click: handleDelete,
+          }
+        );
+      } else if (row.status === "paused") {
+        // 暂停的任务：继续，取消，删除
+        buttons.push(
+          {
+            text: "继续",
+            type: "success",
+            click: handleResume,
+          },
+          {
+            text: "取消",
+            type: "warning",
+            click: handleCancel,
+          },
+          {
+            text: "删除",
+            type: "danger",
+            click: handleDelete,
+          }
+        );
+      } else {
+        // 其他状态（completed, error, cancelled）：只显示删除
+        buttons.push({
+          text: "删除",
+          type: "danger",
+          click: handleDelete,
+        });
+      }
+
+      return buttons;
+    },
   },
 ]);
 
@@ -431,7 +563,7 @@ const visibleColumns = computed(() => {
 });
 
 // 状态
-const loading = ref(false);
+const { loading, withLoading } = useLoading();
 const page = ref(1);
 const pageSize = ref(10);
 const total = ref(0);
@@ -446,63 +578,63 @@ const createForm = ref({
 
 // 数据获取
 async function fetchData() {
-  loading.value = true;
-  try {
-    const params: any = {
-      page: page.value,
-      page_size: pageSize.value,
-    };
+  await withLoading(async () => {
+    try {
+      const params: any = {
+        page: page.value,
+        page_size: pageSize.value,
+      };
 
-    // 状态筛选
-    if (advSearchParams.value.status) {
-      params.status = advSearchParams.value.status;
-    }
-
-    const response = await getDedupTasks(params);
-
-    if (response.success && response.data) {
-      let filteredList = [...response.data.list];
-
-      // 关键词搜索（搜索任务名称）
-      if (searchKeyword.value) {
-        const keyword = searchKeyword.value.toLowerCase();
-        filteredList = filteredList.filter((task) =>
-          task.task_name.toLowerCase().includes(keyword)
-        );
+      // 状态筛选
+      if (advSearchParams.value.status) {
+        params.status = advSearchParams.value.status;
       }
 
-      // 高级搜索：创建时间范围
-      if (
-        advSearchParams.value.created_at &&
-        Array.isArray(advSearchParams.value.created_at) &&
-        advSearchParams.value.created_at.length === 2
-      ) {
-        const [start, end] = advSearchParams.value.created_at;
-        if (start && end) {
-          const startDate = new Date(start);
-          const endDate = new Date(end);
-          endDate.setHours(23, 59, 59, 999);
-          filteredList = filteredList.filter((task) => {
-            const date = new Date(task.created_at);
-            return date >= startDate && date <= endDate;
-          });
+      const response = await getDedupTasks(params);
+
+      if (response.success && response.data) {
+        let filteredList = [...response.data.list];
+
+        // 关键词搜索（搜索任务名称）
+        if (searchKeyword.value) {
+          const keyword = searchKeyword.value.toLowerCase();
+          filteredList = filteredList.filter((task) =>
+            task.task_name.toLowerCase().includes(keyword)
+          );
         }
-      }
 
-      tableData.value = filteredList;
-      total.value = response.data.pagination.total;
-    } else {
+        // 高级搜索：创建时间范围
+        if (
+          advSearchParams.value.created_at &&
+          Array.isArray(advSearchParams.value.created_at) &&
+          advSearchParams.value.created_at.length === 2
+        ) {
+          const [start, end] = advSearchParams.value.created_at;
+          if (start && end) {
+            const startDate = new Date(start);
+            const endDate = new Date(end);
+            endDate.setHours(23, 59, 59, 999);
+            filteredList = filteredList.filter((task) => {
+              const date = new Date(task.created_at);
+              return date >= startDate && date <= endDate;
+            });
+          }
+        }
+
+        tableData.value = filteredList;
+        total.value = response.data.pagination.total;
+      } else {
+        tableData.value = [];
+        total.value = 0;
+      }
+    } catch (error: any) {
+      console.error("获取任务列表失败:", error);
+      ElMessage.error(error.message || "数据加载失败");
       tableData.value = [];
       total.value = 0;
+      throw error; // 重新抛出错误，让 withLoading 处理
     }
-  } catch (error: any) {
-    console.error("获取任务列表失败:", error);
-    ElMessage.error(error.message || "数据加载失败");
-    tableData.value = [];
-    total.value = 0;
-  } finally {
-    loading.value = false;
-  }
+  });
 }
 
 // 重置所有筛选条件
@@ -647,26 +779,33 @@ let refreshInterval: number | null = null;
 
 onMounted(() => {
   fetchData().then(() => {
-    // 数据加载完成后，连接 WebSocket 并加入运行中的任务房间
-    socketManager.connect();
+    // 检查是否有运行中的任务，如果有才连接 WebSocket
+    const runningTasks = tableData.value.filter(
+      (task) => task.status === "running"
+    );
     
-    // 监听任务进度更新
-    socketManager.onTaskProgress(handleTaskProgress);
-    
-    // 监听任务完成
-    socketManager.onTaskCompleted(handleTaskCompleted);
-    
-    // 监听任务错误
-    socketManager.onTaskError(handleTaskError);
-    
-    // 等待 WebSocket 连接成功后加入任务房间
-    const socket = socketManager.getSocket();
-    if (socket) {
-      socket.once("connect", () => {
-        joinRunningTasks();
-      });
-      if (socket.connected) {
-        joinRunningTasks();
+    if (runningTasks.length > 0) {
+      // 数据加载完成后，连接 WebSocket 并加入运行中的任务房间
+      socketManager.connect();
+      
+      // 监听任务进度更新
+      socketManager.onTaskProgress(handleTaskProgress);
+      
+      // 监听任务完成
+      socketManager.onTaskCompleted(handleTaskCompleted);
+      
+      // 监听任务错误
+      socketManager.onTaskError(handleTaskError);
+      
+      // 等待 WebSocket 连接成功后加入任务房间
+      const socket = socketManager.getSocket();
+      if (socket) {
+        socket.once("connect", () => {
+          joinRunningTasks();
+        });
+        if (socket.connected) {
+          joinRunningTasks();
+        }
       }
     }
   });
@@ -684,6 +823,9 @@ onMounted(() => {
     });
   }, 30000);
 });
+
+// 注册页面刷新功能
+usePageRefresh(fetchData);
 
 // 组件卸载时清理
 onUnmounted(() => {

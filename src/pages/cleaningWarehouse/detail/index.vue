@@ -459,6 +459,7 @@ import {
   type TaskErrorData,
   type TaskStatusData,
 } from "@/utils/socket";
+import { usePageRefresh } from "@/utils/usePageRefresh";
 
 const router = useRouter();
 const route = useRoute();
@@ -738,6 +739,14 @@ function handleTaskStatus(data: TaskStatusData) {
   }
 }
 
+// 统一的刷新函数
+async function refreshPageData() {
+  await fetchTaskDetail();
+  fetchStatistics();
+  fetchExactGroups();
+  fetchSimilarPairs();
+}
+
 // 生命周期
 onMounted(() => {
   fetchTaskDetail().then(() => {
@@ -770,6 +779,9 @@ onMounted(() => {
     }
   }
 });
+
+// 注册页面刷新功能
+usePageRefresh(refreshPageData);
 
 // 组件卸载时清理
 onUnmounted(() => {

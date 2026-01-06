@@ -86,6 +86,8 @@ import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import TableToolBar from "@/components/tableToolBar/index.vue";
 import { getQuestionStatistics } from "@/api/question";
+import { usePageRefresh } from "@/utils/usePageRefresh";
+import { useLoading } from "@/utils/useLoading";
 
 const router = useRouter();
 
@@ -269,7 +271,7 @@ const visibleColumns = computed(() => {
 });
 
 /* ===================== 状态 ===================== */
-const loading = ref(false);
+const { loading, withLoading } = useLoading();
 const page = ref(1);
 const pageSize = ref(10);
 const total = ref(0);
@@ -277,134 +279,134 @@ const tableData = ref<RepoItem[]>([]);
 
 /* ===================== 方法 ===================== */
 async function fetchData() {
-  loading.value = true;
-  try {
-    // 获取题目统计信息（获取总数，用于所有题库）
-    const response = await getQuestionStatistics({});
+  await withLoading(async () => {
+    try {
+      // 获取题目统计信息（获取总数，用于所有题库）
+      const response = await getQuestionStatistics({});
 
-    if (response.success && response.data) {
-      // 生成多个题库条目（模拟数据）
-      // 所有题库使用相同的题目总数（因为后端暂时不区分不同题库）
-      const totalCount = response.data.total || 0;
-      
-      // 生成题库列表（这里可以后续改为从API获取真实题库列表）
-      let allRepos: RepoItem[] = [
-        {
-          id: 1,
-          name: "原题库1",
-          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30),
-          storage: Math.floor(Math.random() * 1024 * 1024 * 100),
-          questionCount: totalCount, // 使用统计接口获取的总数
-        },
-        {
-          id: 2,
-          name: "原题库2",
-          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 25),
-          storage: Math.floor(Math.random() * 1024 * 1024 * 100),
-          questionCount: totalCount, // 使用统计接口获取的总数
-        },
-        {
-          id: 3,
-          name: "原题库3",
-          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 20),
-          storage: Math.floor(Math.random() * 1024 * 1024 * 100),
-          questionCount: totalCount, // 使用统计接口获取的总数
-        },
-        {
-          id: 4,
-          name: "原题库4",
-          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 15),
-          storage: Math.floor(Math.random() * 1024 * 1024 * 100),
-          questionCount: totalCount, // 使用统计接口获取的总数
-        },
-        {
-          id: 5,
-          name: "原题库5",
-          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10),
-          storage: Math.floor(Math.random() * 1024 * 1024 * 100),
-          questionCount: totalCount, // 使用统计接口获取的总数
-        },
-      ];
+      if (response.success && response.data) {
+        // 生成多个题库条目（模拟数据）
+        // 所有题库使用相同的题目总数（因为后端暂时不区分不同题库）
+        const totalCount = response.data.total || 0;
+        
+        // 生成题库列表（这里可以后续改为从API获取真实题库列表）
+        let allRepos: RepoItem[] = [
+          {
+            id: 1,
+            name: "原题库1",
+            createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30),
+            storage: Math.floor(Math.random() * 1024 * 1024 * 100),
+            questionCount: totalCount, // 使用统计接口获取的总数
+          },
+          {
+            id: 2,
+            name: "原题库2",
+            createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 25),
+            storage: Math.floor(Math.random() * 1024 * 1024 * 100),
+            questionCount: totalCount, // 使用统计接口获取的总数
+          },
+          {
+            id: 3,
+            name: "原题库3",
+            createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 20),
+            storage: Math.floor(Math.random() * 1024 * 1024 * 100),
+            questionCount: totalCount, // 使用统计接口获取的总数
+          },
+          {
+            id: 4,
+            name: "原题库4",
+            createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 15),
+            storage: Math.floor(Math.random() * 1024 * 1024 * 100),
+            questionCount: totalCount, // 使用统计接口获取的总数
+          },
+          {
+            id: 5,
+            name: "原题库5",
+            createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10),
+            storage: Math.floor(Math.random() * 1024 * 1024 * 100),
+            questionCount: totalCount, // 使用统计接口获取的总数
+          },
+        ];
 
-      // 应用筛选条件
-      let filteredList = [...allRepos];
+        // 应用筛选条件
+        let filteredList = [...allRepos];
 
-      // 关键词搜索（搜索题库名称、占用空间、题目数量）
-      if (searchKeyword.value) {
-        const keyword = searchKeyword.value.toLowerCase();
-        filteredList = filteredList.filter((v) => {
-          return (
-            v.name.toLowerCase().includes(keyword) ||
-            formatStorage(v.storage).toLowerCase().includes(keyword) ||
-            v.questionCount.toString().includes(keyword)
-          );
-        });
-      }
-
-      // 高级搜索：题库名称
-      if (advSearchParams.value.name) {
-        const nameStr = advSearchParams.value.name.toLowerCase().trim();
-        if (nameStr) {
-          filteredList = filteredList.filter((v) =>
-            v.name.toLowerCase().includes(nameStr)
-          );
-        }
-      }
-
-      // 高级搜索：创建日期范围
-      if (
-        advSearchParams.value.createdAt &&
-        Array.isArray(advSearchParams.value.createdAt) &&
-        advSearchParams.value.createdAt.length === 2
-      ) {
-        const [start, end] = advSearchParams.value.createdAt;
-        if (start && end) {
-          const startDate = new Date(start);
-          const endDate = new Date(end);
-          endDate.setHours(23, 59, 59, 999);
+        // 关键词搜索（搜索题库名称、占用空间、题目数量）
+        if (searchKeyword.value) {
+          const keyword = searchKeyword.value.toLowerCase();
           filteredList = filteredList.filter((v) => {
-            const date = new Date(v.createdAt);
-            return date >= startDate && date <= endDate;
+            return (
+              v.name.toLowerCase().includes(keyword) ||
+              formatStorage(v.storage).toLowerCase().includes(keyword) ||
+              v.questionCount.toString().includes(keyword)
+            );
           });
         }
-      }
 
-      // 高级搜索：占用空间
-      if (advSearchParams.value.storage) {
-        const storageStr = advSearchParams.value.storage.toLowerCase().trim();
-        if (storageStr) {
-          filteredList = filteredList.filter((v) =>
-            formatStorage(v.storage).toLowerCase().includes(storageStr)
-          );
+        // 高级搜索：题库名称
+        if (advSearchParams.value.name) {
+          const nameStr = advSearchParams.value.name.toLowerCase().trim();
+          if (nameStr) {
+            filteredList = filteredList.filter((v) =>
+              v.name.toLowerCase().includes(nameStr)
+            );
+          }
         }
-      }
 
-      // 高级搜索：题目数量
-      if (advSearchParams.value.questionCount) {
-        const questionCountStr = String(advSearchParams.value.questionCount).trim();
-        if (questionCountStr) {
-          filteredList = filteredList.filter((v) =>
-            v.questionCount.toString().includes(questionCountStr)
-          );
+        // 高级搜索：创建日期范围
+        if (
+          advSearchParams.value.createdAt &&
+          Array.isArray(advSearchParams.value.createdAt) &&
+          advSearchParams.value.createdAt.length === 2
+        ) {
+          const [start, end] = advSearchParams.value.createdAt;
+          if (start && end) {
+            const startDate = new Date(start);
+            const endDate = new Date(end);
+            endDate.setHours(23, 59, 59, 999);
+            filteredList = filteredList.filter((v) => {
+              const date = new Date(v.createdAt);
+              return date >= startDate && date <= endDate;
+            });
+          }
         }
-      }
 
-      // 分页处理
-      const offset = (page.value - 1) * pageSize.value;
-      tableData.value = filteredList.slice(offset, offset + pageSize.value);
-      total.value = filteredList.length;
-    } else {
+        // 高级搜索：占用空间
+        if (advSearchParams.value.storage) {
+          const storageStr = advSearchParams.value.storage.toLowerCase().trim();
+          if (storageStr) {
+            filteredList = filteredList.filter((v) =>
+              formatStorage(v.storage).toLowerCase().includes(storageStr)
+            );
+          }
+        }
+
+        // 高级搜索：题目数量
+        if (advSearchParams.value.questionCount) {
+          const questionCountStr = String(advSearchParams.value.questionCount).trim();
+          if (questionCountStr) {
+            filteredList = filteredList.filter((v) =>
+              v.questionCount.toString().includes(questionCountStr)
+            );
+          }
+        }
+
+        // 分页处理
+        const offset = (page.value - 1) * pageSize.value;
+        tableData.value = filteredList.slice(offset, offset + pageSize.value);
+        total.value = filteredList.length;
+      } else {
+        tableData.value = [];
+        total.value = 0;
+      }
+    } catch (error: any) {
+      console.error("获取题库数据失败:", error);
+      ElMessage.error(error.message || "数据加载失败");
       tableData.value = [];
       total.value = 0;
+      throw error; // 重新抛出错误，让 withLoading 处理
     }
-  } catch (error: any) {
-    console.error("获取题库数据失败:", error);
-    ElMessage.error(error.message || "数据加载失败");
-    tableData.value = [];
-    total.value = 0;
-  } finally {
-    loading.value = false;
-  }
+  });
 }
 
 // 重置所有筛选条件
@@ -435,6 +437,9 @@ function onColumnChange(cols: string[]) {
 
 /* ===================== 生命周期 ===================== */
 onMounted(() => fetchData());
+
+// 注册页面刷新功能
+usePageRefresh(fetchData);
 </script>
 
 <style lang="scss" scoped>

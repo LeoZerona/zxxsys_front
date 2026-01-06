@@ -23,8 +23,9 @@
             :icon="item.icon"
             @click="handleClick(item)"
             :divided="item.divided"
+            :class="{ 'has-icon': item.icon }"
           >
-            {{ item.label }}
+            <span class="menu-label">{{ item.label }}</span>
           </el-dropdown-item>
         </template>
       </el-dropdown-menu>
@@ -145,7 +146,54 @@ defineExpose({ openContextMenu });
 /*  popper 里所有 dropdown 菜单项 */
 :deep(.tabs-context-menu) {
   .el-dropdown-menu__item {
-    justify-content: flex-end;
+    display: flex;
+    align-items: center;
+    position: relative;
+    padding-right: 12px;
+    min-height: 32px;
+    
+    // 图标左对齐，固定位置
+    .el-icon {
+      position: absolute;
+      left: 12px;
+      width: 16px;
+      height: 16px;
+      margin-right: 0;
+      flex-shrink: 0;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    // 文字标签样式
+    .menu-label {
+      display: block;
+      width: 100%;
+    }
+    
+    // 有图标时，文字在图标右侧，右对齐
+    &.has-icon {
+      padding-left: 40px; // 为图标留出足够空间 (12px + 16px图标 + 12px间距)
+      
+      .menu-label {
+        margin-left: auto;
+        text-align: right;
+        flex: 1;
+        min-width: 0;
+        padding-left: 0;
+      }
+    }
+    
+    // 没有图标时，文字右对齐
+    &:not(.has-icon) {
+      padding-left: 12px;
+      justify-content: flex-end;
+      
+      .menu-label {
+        text-align: right;
+      }
+    }
   }
 }
 </style>

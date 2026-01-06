@@ -129,6 +129,8 @@ import QuestionDetailDialog from "./components/QuestionDetailDialog.vue";
 import QuestionEditDialog from "./components/QuestionEditDialog.vue";
 import { getQuestionList, type Question } from "@/api/question";
 import { stripHtmlTags } from "@/utils/common";
+import { usePageRefresh } from "@/utils/usePageRefresh";
+import { useLoading } from "@/utils/useLoading";
 
 // TableToolBar 列配置类型
 interface IColumn {
@@ -761,7 +763,7 @@ const visibleColumns = computed(() => {
 });
 
 /* ===================== 状态 ===================== */
-const loading = ref(false);
+const { loading, withLoading } = useLoading();
 const page = ref(1);
 const pageSize = ref(10);
 const total = ref(0);
@@ -823,75 +825,75 @@ async function fetchData() {
     return;
   }
 
-  loading.value = true;
-  try {
-    // 构建查询参数
-    const params: any = {
-      type: selectedType.value, // 必填参数
-      page: page.value,
-      page_size: pageSize.value,
-      include_answer: true,
-      include_analysis: true,
-    };
+  await withLoading(async () => {
+    try {
+      // 构建查询参数
+      const params: any = {
+        type: selectedType.value, // 必填参数
+        page: page.value,
+        page_size: pageSize.value,
+        include_answer: true,
+        include_analysis: true,
+      };
 
-    // 添加搜索关键字参数（搜索题目内容）
-    if (searchKeyword.value && searchKeyword.value.trim()) {
-      params.keyword = searchKeyword.value.trim();
-    }
+      // 添加搜索关键字参数（搜索题目内容）
+      if (searchKeyword.value && searchKeyword.value.trim()) {
+        params.keyword = searchKeyword.value.trim();
+      }
 
-    // 添加高级搜索参数
-    // 高级搜索中的题目内容字段
-    if (advSearchParams.value.content && advSearchParams.value.content.trim()) {
-      params.keyword = advSearchParams.value.content.trim();
-    }
+      // 添加高级搜索参数
+      // 高级搜索中的题目内容字段
+      if (advSearchParams.value.content && advSearchParams.value.content.trim()) {
+        params.keyword = advSearchParams.value.content.trim();
+      }
 
-    if (advSearchParams.value.subject) {
-      params.subject_name = advSearchParams.value.subject;
-    }
+      if (advSearchParams.value.subject) {
+        params.subject_name = advSearchParams.value.subject;
+      }
 
-    if (advSearchParams.value.subject_id) {
-      params.subject_id = advSearchParams.value.subject_id;
-    }
+      if (advSearchParams.value.subject_id) {
+        params.subject_id = advSearchParams.value.subject_id;
+      }
 
-    if (advSearchParams.value.chapter_id) {
-      params.chapter_id = advSearchParams.value.chapter_id;
-    }
+      if (advSearchParams.value.chapter_id) {
+        params.chapter_id = advSearchParams.value.chapter_id;
+      }
 
-    // 高级搜索：题目类型
-    if (advSearchParams.value.type) {
-      // 注意：如果高级搜索中选择了题目类型，会覆盖 selectedType
-      // 这里可以根据实际需求决定是否允许覆盖
-    }
+      // 高级搜索：题目类型
+      if (advSearchParams.value.type) {
+        // 注意：如果高级搜索中选择了题目类型，会覆盖 selectedType
+        // 这里可以根据实际需求决定是否允许覆盖
+      }
 
-    // 高级搜索：难度等级
-    if (advSearchParams.value.difficulty) {
-      params.difficulty = advSearchParams.value.difficulty;
-    }
+      // 高级搜索：难度等级
+      if (advSearchParams.value.difficulty) {
+        params.difficulty = advSearchParams.value.difficulty;
+      }
 
-    // 高级搜索：分值
-    if (advSearchParams.value.score) {
-      params.score = advSearchParams.value.score;
-    }
+      // 高级搜索：分值
+      if (advSearchParams.value.score) {
+        params.score = advSearchParams.value.score;
+      }
 
-    // 调用API获取题目列表
-    const response = await getQuestionList(params);
+      // 调用API获取题目列表
+      const response = await getQuestionList(params);
 
-    if (response.success && response.data) {
-      // 转换数据格式
-      tableData.value = response.data.list.map(convertQuestion);
-      total.value = response.data.pagination.total;
-    } else {
+      if (response.success && response.data) {
+        // 转换数据格式
+        tableData.value = response.data.list.map(convertQuestion);
+        total.value = response.data.pagination.total;
+      } else {
+        tableData.value = [];
+        total.value = 0;
+      }
+    } catch (error: any) {
+      console.error('获取题目列表失败:', error);
+      ElMessage.error(error.message || "数据加载失败");
       tableData.value = [];
       total.value = 0;
+      throw error; // 重新抛出错误，让 withLoading 处理
     }
-  } catch (error: any) {
-    console.error('获取题目列表失败:', error);
-    ElMessage.error(error.message || "数据加载失败");
-    tableData.value = [];
-    total.value = 0;
-  } finally {
-    loading.value = false;
-  }
+  });
 }
 
 
@@ -903,6 +905,9 @@ onMounted(() => {
   // 默认选择第一个类型（单选题），并自动加载数据
   fetchData();
 });
+
+// 注册页面刷新功能
+usePageRefresh(fetchData);
 </script>
 
 <style lang="scss" scoped>
