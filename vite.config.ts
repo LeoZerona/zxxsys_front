@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd());
 
   // 获取 API 目标地址，如果没有配置则使用默认值
-  const apiTarget = env.VITE_API_TARGET || "http://192.168.0.102:5000";
+  const apiTarget = env.VITE_API_TARGET || "192.168.0.104:5000";
 
   return {
     plugins: [

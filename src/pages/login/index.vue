@@ -957,6 +957,11 @@ const handleSubmit = async () => {
             });
             userStore.setToken(access_token, refresh_token, expires_in);
             
+            // 初始化Token自动刷新
+            import('@/utils/request').then(({ initTokenAutoRefresh }) => {
+              initTokenAutoRefresh();
+            });
+            
             ElMessage.success(response.message || "登录成功");
             
             // 登录成功后重置验证码状态

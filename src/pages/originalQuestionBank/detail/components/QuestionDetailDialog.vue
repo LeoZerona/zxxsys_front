@@ -220,6 +220,12 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { stripHtmlTags } from "@/utils/common";
+import {
+  formatDate,
+  formatQuestionType,
+  formatDifficulty,
+  formatSubject,
+} from "@/utils/formatters";
 
 // 计算分析题子题
 interface SubQuestionItem {
@@ -276,57 +282,13 @@ function handleClose() {
   emit("close");
 }
 
-const formatDate = (d: string | Date) => {
-  const date = new Date(d);
-  const Y = date.getFullYear();
-  const M = String(date.getMonth() + 1).padStart(2, "0");
-  const D = String(date.getDate()).padStart(2, "0");
-  const h = String(date.getHours()).padStart(2, "0");
-  const m = String(date.getMinutes()).padStart(2, "0");
-  return `${Y}-${M}-${D} ${h}:${m}`;
-};
-
-const formatQuestionType = (type: string) => {
-  const typeMap: Record<string, string> = {
-    single: "单选题",
-    multiple: "多选题",
-    fill: "填空题",
-    shortAnswer: "简答题",
-    judge: "判断题",
-    essay: "论述题",
-    calc: "计算分析题",
-    "1": "单选题",
-    "2": "多选题",
-    "3": "判断题",
-    "4": "填空题",
-    "8": "计算分析题",
-  };
-  return typeMap[type] || type;
-};
-
-const formatDifficulty = (difficulty: string) => {
-  const difficultyMap: Record<string, string> = {
-    easy: "简单",
-    medium: "中等",
-    hard: "困难",
-  };
-  return difficultyMap[difficulty] || difficulty;
-};
-
-const formatSubject = (subject: string) => {
-  const subjectMap: Record<string, string> = {
-    math: "数学",
-    chinese: "语文",
-    english: "英语",
-    physics: "物理",
-    chemistry: "化学",
-    biology: "生物",
-    history: "历史",
-    geography: "地理",
-    politics: "政治",
-  };
-  return subjectMap[subject] || subject;
-};
+// 导入格式化工具函数
+import {
+  formatDate,
+  formatQuestionType,
+  formatDifficulty,
+  formatSubject,
+} from "@/utils/formatters";
 
 // 判断选项是否为正确答案
 const isOptionCorrect = (optionLabel: string) => {

@@ -90,6 +90,7 @@
 import { ref, watch, computed } from "vue";
 import { stripHtmlTags } from "@/utils/common";
 import { getExactGroupDetail, type ExactDuplicateGroup } from "@/api/dedup";
+import { formatDate } from "@/utils/formatters";
 
 const props = defineProps<{
   modelValue: boolean;
@@ -110,17 +111,8 @@ const dialogVisible = computed({
 const loading = ref(false);
 const groupDetail = ref<ExactDuplicateGroup | null>(null);
 
-// 工具函数
-const formatDate = (d: string | Date | null | undefined) => {
-  if (!d) return "-";
-  const date = new Date(d);
-  const Y = date.getFullYear();
-  const M = String(date.getMonth() + 1).padStart(2, "0");
-  const D = String(date.getDate()).padStart(2, "0");
-  const h = String(date.getHours()).padStart(2, "0");
-  const m = String(date.getMinutes()).padStart(2, "0");
-  return `${Y}-${M}-${D} ${h}:${m}`;
-};
+// 导入格式化工具函数
+import { formatDate } from "@/utils/formatters";
 
 const isOptionCorrect = (label: string, correctAnswer: string | undefined) => {
   if (!correctAnswer) return false;

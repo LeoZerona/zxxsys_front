@@ -15,7 +15,15 @@ import type { LoadingInstance } from "element-plus/es/components/loading/src/loa
 // - 测试/生产环境：使用完整 URL
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
-  (import.meta.env.DEV ? "/api" : "http://192.168.0.101:5000/api");
+  (import.meta.env.DEV ? "/api" : "http://192.168.0.104:5000/api");
+
+// 后端服务地址（用于获取实际的服务器地址和端口）
+// 在开发环境下，VITE_API_BASE_URL 可能是相对路径 '/api'，需要使用 VITE_API_TARGET 来获取实际的后端地址
+const BACKEND_SERVER_URL =
+  import.meta.env.VITE_API_TARGET || // 优先使用 VITE_API_TARGET（代理目标地址）
+  (API_BASE_URL.startsWith("http://") || API_BASE_URL.startsWith("https://")
+    ? API_BASE_URL.replace(/\/api.*$/, "") // 从完整的 API_BASE_URL 中提取基础地址
+    : null);
 
 // 请求超时时间（从环境变量读取，默认 10 秒）
 const REQUEST_TIMEOUT = Number(import.meta.env.VITE_REQUEST_TIMEOUT) || 10000;
@@ -35,6 +43,10 @@ if (import.meta.env.DEV || import.meta.env.VITE_DEBUG === "true") {
   console.log("环境模式:", import.meta.env.MODE);
   console.log("应用环境:", import.meta.env.VITE_APP_ENV);
   console.log("API Base URL:", API_BASE_URL);
+  console.log(
+    "后端服务地址:",
+    BACKEND_SERVER_URL || "未配置（将从前端地址推断）"
+  );
   console.log("请求超时:", REQUEST_TIMEOUT + "ms");
   console.log("==================");
 }
@@ -42,6 +54,7 @@ if (import.meta.env.DEV || import.meta.env.VITE_DEBUG === "true") {
 // Token 刷新标志，防止并发刷新
 let isRefreshing = false;
 let refreshSubscribers: Array<(token: string) => void> = [];
+let refreshTimer: number | null = null; // Token 自动刷新定时器
 
 // 全局 Loading 管理
 let loadingInstance: LoadingInstance | null = null;
@@ -57,7 +70,9 @@ const loadingConfig = {
  * 生成请求的唯一标识
  */
 function getRequestId(config: InternalAxiosRequestConfig): string {
-  return `${config.method || 'GET'}_${config.url}_${Date.now()}_${Math.random()}`;
+  return `${config.method || "GET"}_${
+    config.url
+  }_${Date.now()}_${Math.random()}`;
 }
 
 /**
@@ -73,11 +88,14 @@ function showLoading(config: InternalAxiosRequestConfig) {
   const requestId = getRequestId(config);
   const timeout = config.timeout || REQUEST_TIMEOUT;
   const timeoutId = window.setTimeout(() => {
-    console.warn(`请求超时保护触发 (${timeout}ms)，强制关闭 loading:`, config.url);
+    console.warn(
+      `请求超时保护触发 (${timeout}ms)，强制关闭 loading:`,
+      config.url
+    );
     hideLoading(config);
     loadingTimeouts.delete(requestId);
   }, timeout + 1000);
-  
+
   loadingTimeouts.set(requestId, timeoutId);
   (config as any).__requestId = requestId;
 }
@@ -133,8 +151,10 @@ function onTokenRefreshed(token: string) {
   refreshSubscribers = [];
 }
 
-// 检查并刷新 Token
-async function checkAndRefreshToken(): Promise<string | null> {
+// 检查并刷新 Token（支持强制刷新）
+async function checkAndRefreshToken(
+  forceRefresh = false
+): Promise<string | null> {
   const refreshTokenValue = localStorage.getItem("refresh_token");
   const expiresAt = localStorage.getItem("token_expires_at");
 
@@ -142,14 +162,16 @@ async function checkAndRefreshToken(): Promise<string | null> {
     return null;
   }
 
-  // 检查是否即将过期（提前5分钟）
-  const expiresAtTime = parseInt(expiresAt);
-  const now = Date.now();
-  const fiveMinutes = 5 * 60 * 1000;
+  // 如果不强制刷新，检查是否即将过期（提前5分钟）
+  if (!forceRefresh) {
+    const expiresAtTime = parseInt(expiresAt);
+    const now = Date.now();
+    const fiveMinutes = 5 * 60 * 1000;
 
-  // 如果还没到刷新时间，直接返回当前 token
-  if (now < expiresAtTime - fiveMinutes) {
-    return localStorage.getItem("access_token");
+    // 如果还没到刷新时间，直接返回当前 token
+    if (now < expiresAtTime - fiveMinutes) {
+      return localStorage.getItem("access_token");
+    }
   }
 
   // 如果正在刷新，等待刷新完成
@@ -165,6 +187,7 @@ async function checkAndRefreshToken(): Promise<string | null> {
   isRefreshing = true;
   try {
     const { refreshToken } = await import("@/api/auth");
+    // 刷新token请求不显示loading，避免循环刷新
     const response = await refreshToken(refreshTokenValue);
 
     if (response.success && response.data) {
@@ -174,9 +197,24 @@ async function checkAndRefreshToken(): Promise<string | null> {
       localStorage.setItem("access_token", access_token);
       localStorage.setItem("token_expires_at", newExpiresAt.toString());
 
+      // 更新用户store中的token
+      import("@/stores/modules/user").then(({ useUserStore }) => {
+        const userStore = useUserStore();
+        if (userStore.token.refreshToken) {
+          userStore.setToken(
+            access_token,
+            userStore.token.refreshToken,
+            expires_in
+          );
+        }
+      });
+
       // 通知所有订阅者
       onTokenRefreshed(access_token);
       isRefreshing = false;
+
+      // 设置下一次自动刷新定时器
+      setupAutoRefresh(expires_in);
 
       return access_token;
     }
@@ -185,12 +223,63 @@ async function checkAndRefreshToken(): Promise<string | null> {
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
     localStorage.removeItem("token_expires_at");
+
+    // 清除用户状态
+    import("@/stores/modules/user").then(({ useUserStore }) => {
+      const userStore = useUserStore();
+      userStore.clearToken();
+    });
+
     isRefreshing = false;
     return null;
   }
 
   isRefreshing = false;
   return null;
+}
+
+// 设置自动刷新定时器
+function setupAutoRefresh(expiresIn: number) {
+  // 清除旧的定时器
+  if (refreshTimer !== null) {
+    clearTimeout(refreshTimer);
+    refreshTimer = null;
+  }
+
+  // 计算刷新时间（提前5分钟）
+  const refreshDelay = (expiresIn - 300) * 1000;
+
+  if (refreshDelay > 0) {
+    refreshTimer = window.setTimeout(() => {
+      console.log("Token即将过期，自动刷新...");
+      checkAndRefreshToken(true).catch((error) => {
+        console.error("自动刷新token失败:", error);
+      });
+    }, refreshDelay);
+  }
+}
+
+// 初始化自动刷新（在应用启动时调用）
+export function initTokenAutoRefresh() {
+  const expiresAt = localStorage.getItem("token_expires_at");
+  const refreshToken = localStorage.getItem("refresh_token");
+
+  if (!expiresAt || !refreshToken) {
+    return;
+  }
+
+  const expiresAtTime = parseInt(expiresAt);
+  const now = Date.now();
+  const expiresIn = Math.floor((expiresAtTime - now) / 1000);
+
+  if (expiresIn > 0) {
+    setupAutoRefresh(expiresIn);
+  } else {
+    // 如果已经过期，尝试刷新
+    checkAndRefreshToken(true).catch((error) => {
+      console.error("初始化时刷新token失败:", error);
+    });
+  }
 }
 
 // 请求拦截器
@@ -226,11 +315,138 @@ request.interceptors.request.use(
   }
 );
 
+/**
+ * 从后端服务配置中提取服务器地址和端口号
+ * 优先从 VITE_API_TARGET 或完整的 API_BASE_URL 中提取，而不是使用前端地址
+ */
+function extractBackendServerInfo(): {
+  host: string;
+  port: string | number;
+  protocol: string;
+} | null {
+  // 优先使用 VITE_API_TARGET（后端服务地址，用于代理）
+  if (BACKEND_SERVER_URL) {
+    // 确保 URL 包含协议
+    let backendUrl = BACKEND_SERVER_URL;
+    if (
+      !backendUrl.startsWith("http://") &&
+      !backendUrl.startsWith("https://")
+    ) {
+      backendUrl = `http://${backendUrl}`;
+    }
+
+    try {
+      const urlObj = new URL(backendUrl);
+      return {
+        protocol: urlObj.protocol.replace(":", ""),
+        host: urlObj.hostname,
+        port: urlObj.port
+          ? parseInt(urlObj.port)
+          : urlObj.protocol === "https:"
+          ? 443
+          : 80,
+      };
+    } catch (e) {
+      // URL 解析失败，尝试手动解析
+      try {
+        const match = backendUrl.match(
+          /^(https?):\/\/([^:/]+)(?::(\d+))?(?:\/.*)?$/
+        );
+        if (match) {
+          return {
+            protocol: match[1],
+            host: match[2],
+            port: match[3]
+              ? parseInt(match[3])
+              : match[1] === "https"
+              ? 443
+              : 80,
+          };
+        }
+      } catch (e2) {
+        // 手动解析也失败
+      }
+    }
+  }
+
+  // 如果 VITE_API_TARGET 不存在，尝试从完整的 API_BASE_URL 中提取
+  if (
+    API_BASE_URL &&
+    (API_BASE_URL.startsWith("http://") || API_BASE_URL.startsWith("https://"))
+  ) {
+    try {
+      const urlObj = new URL(API_BASE_URL);
+      return {
+        protocol: urlObj.protocol.replace(":", ""),
+        host: urlObj.hostname,
+        port: urlObj.port
+          ? parseInt(urlObj.port)
+          : urlObj.protocol === "https:"
+          ? 443
+          : 80,
+      };
+    } catch (e) {
+      // URL 解析失败，尝试手动解析
+      try {
+        const match = API_BASE_URL.match(
+          /^(https?):\/\/([^:/]+)(?::(\d+))?(?:\/.*)?$/
+        );
+        if (match) {
+          return {
+            protocol: match[1],
+            host: match[2],
+            port: match[3]
+              ? parseInt(match[3])
+              : match[1] === "https"
+              ? 443
+              : 80,
+          };
+        }
+      } catch (e2) {
+        // 手动解析也失败
+      }
+    }
+  }
+
+  // 如果都失败，返回 null（不应该到达这里，因为至少应该有默认值）
+  return null;
+}
+
+/**
+ * 格式化后端服务器信息用于日志输出
+ * 始终从后端服务配置中提取，而不是从前端地址
+ */
+function formatBackendServerInfo(): string {
+  const serverInfo = extractBackendServerInfo();
+  if (serverInfo) {
+    const portDisplay =
+      serverInfo.port === 80 || serverInfo.port === 443
+        ? ""
+        : `:${serverInfo.port}`;
+    return `${serverInfo.protocol}://${serverInfo.host}${portDisplay}`;
+  }
+
+  // 如果解析失败，尝试返回 VITE_API_TARGET 或 API_BASE_URL
+  if (BACKEND_SERVER_URL) {
+    return BACKEND_SERVER_URL;
+  }
+  if (
+    API_BASE_URL &&
+    (API_BASE_URL.startsWith("http://") || API_BASE_URL.startsWith("https://"))
+  ) {
+    return API_BASE_URL.replace(/\/api.*$/, "");
+  }
+
+  return "未知（请检查 VITE_API_TARGET 或 VITE_API_BASE_URL 配置）";
+}
+
 // 响应拦截器
 request.interceptors.response.use(
   (response: AxiosResponse) => {
     // 隐藏 loading（成功响应）
-    const config = response.config as InternalAxiosRequestConfig & { skipLoading?: boolean };
+    const config = response.config as InternalAxiosRequestConfig & {
+      skipLoading?: boolean;
+    };
     if (!config.skipLoading) {
       hideLoading();
     }
@@ -251,10 +467,14 @@ request.interceptors.response.use(
             code: data.code,
             requires_captcha: data.requires_captcha,
             attempt_count: data.attempt_count,
+            _handled: true, // 标记错误已处理，避免重复显示
           });
         }
+        // 标记错误已处理，避免在错误响应拦截器中重复显示
+        const error = new Error(message) as any;
+        error._handled = true;
         ElMessage.error(message);
-        return Promise.reject(new Error(message));
+        return Promise.reject(error);
       }
       // 返回数据部分
       return data;
@@ -263,9 +483,11 @@ request.interceptors.response.use(
     // 如果后端直接返回数据，则直接返回
     return data;
   },
-  (error: AxiosError<any>) => {
+  async (error: AxiosError<any>) => {
     // 隐藏 loading（错误响应）
-    const config = error.config as InternalAxiosRequestConfig & { skipLoading?: boolean };
+    const config = error.config as InternalAxiosRequestConfig & {
+      skipLoading?: boolean;
+    };
     if (!config?.skipLoading) {
       hideLoading();
     }
@@ -283,17 +505,58 @@ request.interceptors.response.use(
             // 验证码相关错误，不显示通用错误消息，由业务代码处理
             break;
           }
-          ElMessage.error(data?.message || "请求参数错误");
+          // 检查错误是否已经在成功响应拦截器中处理过（通过 _handled 标记）
+          if (!error._handled) {
+            ElMessage.error(data?.message || "请求参数错误");
+          }
           break;
         case 401:
           // 处理 Token 过期或无效
           const errorCode = data?.code;
+          const originalRequest = error.config as InternalAxiosRequestConfig & {
+            _retry?: boolean;
+          };
+
+          // 如果是token过期，尝试自动刷新
           if (
-            errorCode === "INVALID_TOKEN" ||
-            errorCode === "TOKEN_EXPIRED" ||
+            (errorCode === "TOKEN_EXPIRED" || errorCode === "INVALID_TOKEN") &&
+            originalRequest &&
+            !originalRequest._retry &&
+            originalRequest.url !== "/refresh-token" &&
+            !originalRequest.url?.includes("/refresh-token") // 避免刷新token接口本身失败时循环
+          ) {
+            originalRequest._retry = true;
+
+            try {
+              // 尝试刷新token
+              const newToken = await checkAndRefreshToken(true);
+
+              if (newToken) {
+                // 刷新成功，重试原请求
+                if (originalRequest.headers) {
+                  originalRequest.headers.Authorization = `Bearer ${newToken}`;
+                }
+
+                // 不显示loading，因为这是重试请求
+                (originalRequest as any).skipLoading = true;
+
+                // 重试原请求
+                return request(originalRequest);
+              }
+            } catch (refreshError) {
+              // 刷新token失败，继续执行下面的错误处理
+              console.error("刷新token失败:", refreshError);
+            }
+          }
+
+          // 不可恢复的错误：刷新token失败、refresh_token无效等
+          if (
             errorCode === "INVALID_REFRESH_TOKEN" ||
             errorCode === "TOKEN_REVOKED" ||
-            errorCode === "USER_NOT_FOUND"
+            errorCode === "USER_NOT_FOUND" ||
+            !originalRequest ||
+            originalRequest.url === "/refresh-token" ||
+            originalRequest.url?.includes("/refresh-token") // 刷新token接口失败
           ) {
             // 清除 token
             localStorage.removeItem("access_token");
@@ -316,7 +579,8 @@ request.interceptors.response.use(
             ) {
               window.location.href = "/login";
             }
-          } else {
+          } else if (originalRequest && !originalRequest._retry) {
+            // 其他401错误，且未尝试过刷新
             ElMessage.error(data?.message || "未授权，请重新登录");
           }
           break;
@@ -344,6 +608,41 @@ request.interceptors.response.use(
           ElMessage.error(data?.message || `请求失败 (${status})`);
       }
 
+      // 提取后端服务器地址和端口号信息（从后端服务配置中提取）
+      const backendServerInfo = formatBackendServerInfo();
+      const backendServerDetails = extractBackendServerInfo();
+
+      // 打印详细的错误信息，包含后端服务器地址和端口号
+      console.error("请求失败 (HTTP错误):", {
+        message: data?.message || "请求失败",
+        status,
+        code: data?.code,
+        backendServer: backendServerInfo, // 后端服务器地址
+        backendServerDetails: backendServerDetails
+          ? {
+              协议: backendServerDetails.protocol,
+              主机: backendServerDetails.host,
+              端口: backendServerDetails.port,
+            }
+          : null,
+        url: error.config?.url,
+        baseURL: error.config?.baseURL,
+        fullURL: error.config?.baseURL
+          ? (error.config.baseURL.endsWith("/")
+              ? error.config.baseURL.slice(0, -1)
+              : error.config.baseURL) +
+            (error.config.url?.startsWith("/")
+              ? error.config.url
+              : "/" + (error.config.url || ""))
+          : error.config?.url,
+        method: error.config?.method?.toUpperCase(),
+        timestamp: new Date().toISOString(),
+        data: data?.data,
+        cooldown_seconds: data?.cooldown_seconds,
+        requires_captcha: data?.requires_captcha,
+        attempt_count: data?.attempt_count,
+      });
+
       // 返回错误信息，包含 cooldown_seconds 等额外信息
       return Promise.reject({
         message: data?.message || "请求失败",
@@ -357,7 +656,7 @@ request.interceptors.response.use(
     } else if (error.request) {
       // 请求已发出但没有收到响应（可能是超时或网络错误）
       let errorMsg = "网络错误，请检查后端服务是否启动或网络连接是否正常";
-      
+
       // 检查是否是超时错误
       if (error.code === "ECONNABORTED" || error.message?.includes("timeout")) {
         errorMsg = `请求超时（${REQUEST_TIMEOUT}ms），请稍后重试`;
@@ -366,20 +665,61 @@ request.interceptors.response.use(
           forceHideLoading();
         }
       }
-      
-      console.error("请求失败:", {
+
+      // 提取后端服务器地址和端口号信息（从后端服务配置中提取）
+      const backendServerInfo = formatBackendServerInfo();
+      const backendServerDetails = extractBackendServerInfo();
+      const fullURL = error.config?.baseURL
+        ? (error.config.baseURL.endsWith("/")
+            ? error.config.baseURL.slice(0, -1)
+            : error.config.baseURL) +
+          (error.config.url?.startsWith("/")
+            ? error.config.url
+            : "/" + (error.config.url || ""))
+        : error.config?.url || "未知";
+
+      console.error("请求失败 (网络错误):", {
         message: errorMsg,
+        backendServer: backendServerInfo, // 后端服务器地址
+        backendServerDetails: backendServerDetails
+          ? {
+              协议: backendServerDetails.protocol,
+              主机: backendServerDetails.host,
+              端口: backendServerDetails.port,
+            }
+          : null,
         url: error.config?.url,
         baseURL: error.config?.baseURL,
-        fullURL: error.config?.baseURL + error.config?.url,
+        fullURL: fullURL,
+        method: error.config?.method?.toUpperCase(),
         error: error.message,
         code: error.code,
+        timestamp: new Date().toISOString(),
       });
       ElMessage.error(errorMsg);
       return Promise.reject(new Error(errorMsg));
     } else {
       // 其他错误（如请求配置错误）
-      console.error("请求配置错误:", error);
+      const backendServerInfo = formatBackendServerInfo();
+      const backendServerDetails = extractBackendServerInfo();
+
+      console.error("请求配置错误:", {
+        error: error.message,
+        stack: error.stack,
+        backendServer: backendServerInfo, // 后端服务器地址
+        backendServerDetails: backendServerDetails
+          ? {
+              协议: backendServerDetails.protocol,
+              主机: backendServerDetails.host,
+              端口: backendServerDetails.port,
+            }
+          : null,
+        url: error.config?.url,
+        baseURL: error.config?.baseURL,
+        method: error.config?.method?.toUpperCase(),
+        timestamp: new Date().toISOString(),
+        fullError: error,
+      });
       ElMessage.error("请求配置错误");
       return Promise.reject(error);
     }

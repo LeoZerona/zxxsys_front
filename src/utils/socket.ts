@@ -11,7 +11,7 @@ const getWebSocketURL = () => {
   if (import.meta.env.VITE_WS_BASE_URL) {
     return import.meta.env.VITE_WS_BASE_URL;
   }
-  
+
   // 开发环境：优先使用 VITE_API_TARGET（后端服务地址）
   if (import.meta.env.DEV) {
     const apiTarget = import.meta.env.VITE_API_TARGET;
@@ -21,17 +21,18 @@ const getWebSocketURL = () => {
     // 如果没有配置，使用默认值
     return "http://localhost:5000";
   }
-  
+
   // 生产/测试环境：从 VITE_API_BASE_URL 推断基础 URL
-  const apiUrl = import.meta.env.VITE_API_BASE_URL || "http://192.168.0.101:5000/api";
+  const apiUrl =
+    import.meta.env.VITE_API_BASE_URL || "http://192.168.0.104:5000/api";
   if (apiUrl.startsWith("http")) {
     // 提取基础 URL（去掉 /api）
     const baseUrl = apiUrl.replace("/api", "");
     return baseUrl;
   }
-  
+
   // 默认值
-  return "http://192.168.0.101:5000";
+  return "http://192.168.0.104:5000";
 };
 
 // 任务进度数据类型
@@ -90,7 +91,10 @@ class SocketManager {
     }
 
     // 如果超过最大重连次数，停止连接
-    if (this.reconnectAttempts >= this.maxReconnectAttempts && !this.shouldReconnect) {
+    if (
+      this.reconnectAttempts >= this.maxReconnectAttempts &&
+      !this.shouldReconnect
+    ) {
       console.warn("WebSocket 已达到最大重连次数，停止连接");
       return;
     }
@@ -108,7 +112,9 @@ class SocketManager {
 
     this.socket = io(wsUrl, {
       transports: ["websocket", "polling"], // 优先使用 WebSocket，失败时降级到轮询
-      reconnection: this.shouldReconnect && this.reconnectAttempts < this.maxReconnectAttempts, // 根据重连次数决定是否自动重连
+      reconnection:
+        this.shouldReconnect &&
+        this.reconnectAttempts < this.maxReconnectAttempts, // 根据重连次数决定是否自动重连
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       reconnectionAttempts: this.maxReconnectAttempts,
@@ -135,7 +141,7 @@ class SocketManager {
       this.connected = false;
       this.isConnecting = false;
       console.log("WebSocket 断开连接:", reason);
-      
+
       // 如果是主动断开，不重连
       if (reason === "io client disconnect") {
         this.shouldReconnect = false;
@@ -147,7 +153,7 @@ class SocketManager {
       this.isConnecting = false;
       this.reconnectAttempts++;
       console.error("WebSocket 连接错误:", error);
-      
+
       // 如果达到最大重连次数，停止重连并提示用户
       if (this.reconnectAttempts >= this.maxReconnectAttempts) {
         this.shouldReconnect = false;
@@ -160,7 +166,9 @@ class SocketManager {
 
     // 监听重连尝试
     this.socket.on("reconnect_attempt", (attemptNumber) => {
-      console.log(`WebSocket 重连尝试 ${attemptNumber}/${this.maxReconnectAttempts}`);
+      console.log(
+        `WebSocket 重连尝试 ${attemptNumber}/${this.maxReconnectAttempts}`
+      );
     });
 
     // 监听重连失败
@@ -333,4 +341,3 @@ class SocketManager {
 
 // 导出单例
 export const socketManager = new SocketManager();
-

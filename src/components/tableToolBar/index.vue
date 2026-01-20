@@ -172,6 +172,7 @@ import {
   Setting,
   Check,
 } from "@element-plus/icons-vue";
+import { useDebounceFn } from "@/utils/debounce";
 
 /* ===== 类型 ===== */
 interface IOption {
@@ -350,9 +351,13 @@ function handleInvert() {
     .filter((p) => !set.has(p));
 }
 
-/* ===== 普通搜索处理 ===== */
-function handleSearch() {
+/* ===== 普通搜索处理（带防抖） ===== */
+const debouncedSearch = useDebounceFn(() => {
   emit("search", keyword.value);
+}, 300);
+
+function handleSearch() {
+  debouncedSearch();
 }
 
 /* ===== 导入 ===== */

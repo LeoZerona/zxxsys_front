@@ -53,22 +53,11 @@
 <script setup lang="ts">
 import { stripHtmlTags } from "@/utils/common";
 import type { QuestionDetail } from "@/api/dedup";
+import { formatDate } from "@/utils/formatters";
 
 const props = defineProps<{
   question: QuestionDetail;
 }>();
-
-// 工具函数
-const formatDate = (d: string | Date | null | undefined) => {
-  if (!d) return "-";
-  const date = new Date(d);
-  const Y = date.getFullYear();
-  const M = String(date.getMonth() + 1).padStart(2, "0");
-  const D = String(date.getDate()).padStart(2, "0");
-  const h = String(date.getHours()).padStart(2, "0");
-  const m = String(date.getMinutes()).padStart(2, "0");
-  return `${Y}-${M}-${D} ${h}:${m}`;
-};
 
 const isOptionCorrect = (label: string, correctAnswer: string | undefined) => {
   if (!correctAnswer) return false;

@@ -139,11 +139,18 @@ export async function refreshToken(
   refreshToken: string
 ): Promise<RefreshTokenResponse> {
   try {
-    const response = await request.post<RefreshTokenResponse>('/refresh-token', {
-      refresh_token: refreshToken,
-    })
+    // 刷新token请求不显示loading，避免循环刷新
+    const response = await request.post<RefreshTokenResponse>(
+      '/refresh-token',
+      {
+        refresh_token: refreshToken,
+      },
+      {
+        skipLoading: true, // 刷新token时不显示loading
+      } as any
+    )
     return response
-  } catch (error: any) {
+  } catch (error: unknown) {
     // 错误已经在拦截器中处理，这里直接抛出
     throw error
   }

@@ -88,6 +88,7 @@ import TableToolBar from "@/components/tableToolBar/index.vue";
 import { getQuestionStatistics } from "@/api/question";
 import { usePageRefresh } from "@/utils/usePageRefresh";
 import { useLoading } from "@/utils/useLoading";
+import { formatDate } from "@/utils/formatters";
 
 const router = useRouter();
 
@@ -153,15 +154,7 @@ interface Column {
 }
 
 /* ===================== 工具函数（需要在列配置之前定义） ===================== */
-const formatDate = (d: string | Date) => {
-  const date = new Date(d);
-  const Y = date.getFullYear();
-  const M = String(date.getMonth() + 1).padStart(2, "0");
-  const D = String(date.getDate()).padStart(2, "0");
-  const h = String(date.getHours()).padStart(2, "0");
-  const m = String(date.getMinutes()).padStart(2, "0");
-  return `${Y}-${M}-${D} ${h}:${m}`;
-};
+// 格式化工具函数已在顶部导入
 
 const formatStorage = (bytes: number) => {
   if (bytes === 0) return "0 B";

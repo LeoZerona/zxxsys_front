@@ -3,102 +3,85 @@
     <!-- 面包屑导航和返回按钮 -->
     <div class="page-header">
       <el-breadcrumb separator="/" class="breadcrumb">
-        <el-breadcrumb-item :to="{ name: 'originalQuestionBank' }">原题库</el-breadcrumb-item>
-        <el-breadcrumb-item>{{ bankName || '题库内容' }}</el-breadcrumb-item>
+        <el-breadcrumb-item :to="{ name: 'originalQuestionBank' }"
+          >原题库</el-breadcrumb-item
+        >
+        <el-breadcrumb-item>{{ bankName || "题库内容" }}</el-breadcrumb-item>
       </el-breadcrumb>
       <el-button :icon="ArrowLeft" @click="handleBack">返回</el-button>
     </div>
 
     <!-- 题目类型快速筛选 -->
-    <div class="type-filter-bar">
-      <div class="type-label">题目类型：</div>
-      <div class="type-buttons">
-        <el-button
-          v-for="type in questionTypes"
-          :key="type.value"
-          :type="selectedType === type.value ? 'primary' : 'default'"
-          size="small"
-          @click="handleTypeFilter(type.value)"
-        >
-          {{ type.label }}
-        </el-button>
+    <TypeFilterBar
+      v-model="selectedType"
+      :question-types="questionTypes"
+      @change="handleTypeFilter"
+    />
+
+    <!-- 工具栏和视图切换 -->
+    <div class="toolbar-section">
+      <TableToolBar
+        ref="tableToolBarRef"
+        placeholder="搜索题目内容"
+        :columns="tableToolBarColumns"
+        v-model:model-keyword="searchKeyword"
+        v-model:model-adv-search="advSearchParams"
+        v-model:model-checked-columns="checkedCols"
+        @add="onAdd"
+        @edit="onEdit"
+        @del="onDel"
+        @import="onImport"
+        @export="onExport"
+        @search="onSearch"
+        @adv-search="onAdvSearch"
+        @column-change="onColumnChange"
+        @reset="handleReset"
+      />
+      <div class="view-toggle">
+        <el-button-group>
+          <el-button
+            :type="mainViewMode === 'table' ? 'primary' : 'default'"
+            :icon="Document"
+            @click="mainViewMode = 'table'"
+          >
+            题目列表
+          </el-button>
+          <el-button
+            :type="mainViewMode === 'statistics' ? 'primary' : 'default'"
+            :icon="PieChartIcon"
+            @click="mainViewMode = 'statistics'"
+          >
+            数据统计
+          </el-button>
+        </el-button-group>
       </div>
     </div>
 
-    <!-- 工具栏 -->
-    <TableToolBar
-      ref="tableToolBarRef"
-      placeholder="搜索题目内容"
-      :columns="tableToolBarColumns"
-      v-model:model-keyword="searchKeyword"
-      v-model:model-adv-search="advSearchParams"
-      v-model:model-checked-columns="checkedCols"
-      @add="onAdd"
-      @edit="onEdit"
-      @del="onDel"
-      @import="onImport"
-      @export="onExport"
-      @search="onSearch"
-      @adv-search="onAdvSearch"
-      @column-change="onColumnChange"
-      @reset="handleReset"
-    />
-
-    <!-- 表格 -->
-    <el-table
-      v-loading="loading"
-      :data="tableData"
-      stripe
-      fit
-      empty-text="暂无数据"
-      class="data-table"
-    >
-      <el-table-column
-        v-for="col in visibleColumns"
-        :key="col.prop"
-        :prop="col.prop"
-        :label="col.label"
-        :width="col.width"
-        :min-width="col.minWidth"
-        :align="col.align || 'center'"
-        :fixed="col.fixed"
-      >
-        <template #default="{ row }">
-          <span 
-            v-if="!col.actionButtons"
-            :class="{ 'multi-line-answer': col.prop === 'correctAnswer' && (row.type === '4' || row.type === '8') }"
-          >
-            {{
-              col.formatter ? col.formatter(row[col.prop], row) : row[col.prop]
-            }}
-          </span>
-          <div v-else class="action-group">
-            <el-button
-              v-for="btn in col.actionButtons"
-              :key="btn.text"
-              link
-              :type="btn.type || 'primary'"
-              @click="btn.click(row)"
-            >
-              {{ btn.text }}
-            </el-button>
-          </div>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <!-- 分页 -->
-    <div class="pagination-bar">
-      <el-pagination
-        v-model:current-page="page"
-        v-model:page-size="pageSize"
-        :page-sizes="[10, 20, 50, 100]"
+    <!-- 内容区域：题目表格或统计数据 -->
+    <div class="content-area">
+      <!-- 题目表格 -->
+      <QuestionTableView
+        v-show="mainViewMode === 'table'"
+        :loading="loading"
+        :table-data="tableData"
+        :columns="columns"
+        :checked-cols="checkedCols"
+        :page="page"
+        :page-size="pageSize"
         :total="total"
-        layout="sizes, prev, pager, next, jumper, total"
-        size="small"
-        background
-        @size-change="fetchData"
-        @current-change="fetchData"
+        @page-change="(p) => { page = p; fetchData(); }"
+        @page-size-change="(s) => { pageSize = s; fetchData(); }"
+      />
+
+      <!-- 统计面板 -->
+      <QuestionStatisticsView
+        v-show="mainViewMode === 'statistics'"
+        :loading="loadingStatistics"
+        :type-statistics="typeStatistics"
+        :subject-statistics="subjectStatistics"
+        :total-count="totalCount"
+        v-model:view-mode="statViewMode"
+        v-model:active-tab="activeStatTab"
       />
     </div>
 
@@ -123,14 +106,33 @@
 import { ref, onMounted, computed, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { ElMessage } from "element-plus";
-import { ArrowLeft } from "@element-plus/icons-vue";
+import {
+  ArrowLeft,
+  Document,
+  PieChart as PieChartIcon,
+} from "@element-plus/icons-vue";
 import TableToolBar from "@/components/tableToolBar/index.vue";
+import QuestionTableView from "./components/QuestionTableView.vue";
+import QuestionStatisticsView from "./components/QuestionStatisticsView.vue";
+import TypeFilterBar from "./components/TypeFilterBar.vue";
 import QuestionDetailDialog from "./components/QuestionDetailDialog.vue";
 import QuestionEditDialog from "./components/QuestionEditDialog.vue";
-import { getQuestionList, type Question } from "@/api/question";
+import {
+  getQuestionList,
+  getQuestionStatistics,
+  type Question,
+  type StatisticsItem,
+  type QuestionListParams,
+} from "@/api/question";
 import { stripHtmlTags } from "@/utils/common";
 import { usePageRefresh } from "@/utils/usePageRefresh";
 import { useLoading } from "@/utils/useLoading";
+import {
+  formatDate,
+  formatQuestionType,
+  formatDifficulty,
+  formatSubject,
+} from "@/utils/formatters";
 
 // TableToolBar 列配置类型
 interface IColumn {
@@ -160,7 +162,14 @@ interface QuestionItem {
   subject: string; // 科目
   subjectId?: number; // 科目ID
   content: string;
-  questionType: "single" | "multiple" | "fill" | "shortAnswer" | "judge" | "essay" | "calc"; // calc=计算分析题
+  questionType:
+    | "single"
+    | "multiple"
+    | "fill"
+    | "shortAnswer"
+    | "judge"
+    | "essay"
+    | "calc"; // calc=计算分析题
   type?: string; // 题型代码：1=单选, 2=多选, 3=判断, 4=填空, 8=计算分析
   difficulty?: "easy" | "medium" | "hard";
   score?: number;
@@ -202,62 +211,14 @@ interface Column {
 /* ===================== 路由和参数 ===================== */
 const router = useRouter();
 const route = useRoute();
-const bankId = computed(() => route.params.id as string || route.query.id as string);
+const bankId = computed(
+  () => (route.params.id as string) || (route.query.id as string)
+);
 const bankName = ref<string>("");
 // 注意：虽然从路由获取了题库ID，但后端暂时不区分，所有题库都返回相同数据
 
 /* ===================== 工具函数 ===================== */
-const formatDate = (d: string | Date) => {
-  const date = new Date(d);
-  const Y = date.getFullYear();
-  const M = String(date.getMonth() + 1).padStart(2, "0");
-  const D = String(date.getDate()).padStart(2, "0");
-  const h = String(date.getHours()).padStart(2, "0");
-  const m = String(date.getMinutes()).padStart(2, "0");
-  return `${Y}-${M}-${D} ${h}:${m}`;
-};
-
-const formatQuestionType = (type: string) => {
-  const typeMap: Record<string, string> = {
-    single: "单选题",
-    multiple: "多选题",
-    fill: "填空题",
-    shortAnswer: "简答题",
-    judge: "判断题",
-    essay: "论述题",
-    calc: "计算分析题",
-    "1": "单选题",
-    "2": "多选题",
-    "3": "判断题",
-    "4": "填空题",
-    "8": "计算分析题",
-  };
-  return typeMap[type] || type;
-};
-
-const formatDifficulty = (difficulty: string) => {
-  const difficultyMap: Record<string, string> = {
-    easy: "简单",
-    medium: "中等",
-    hard: "困难",
-  };
-  return difficultyMap[difficulty] || difficulty;
-};
-
-const formatSubject = (subject: string) => {
-  const subjectMap: Record<string, string> = {
-    math: "数学",
-    chinese: "语文",
-    english: "英语",
-    physics: "物理",
-    chemistry: "化学",
-    biology: "生物",
-    history: "历史",
-    geography: "地理",
-    politics: "政治",
-  };
-  return subjectMap[subject] || subject;
-};
+// 格式化工具函数已在顶部导入
 
 /* ===================== 业务方法 ===================== */
 const showDetailDialog = ref(false);
@@ -275,7 +236,6 @@ function handleEdit(row: QuestionItem) {
 }
 
 function handleTypeFilter(type: string) {
-  selectedType.value = type;
   // 更新筛选条件并重新获取数据
   page.value = 1;
   fetchData();
@@ -297,30 +257,30 @@ function convertTypeCode(type: string): string {
 function convertQuestion(question: Question): QuestionItem {
   const typeCode = question.type;
   const convertedType = convertTypeCode(typeCode);
-  
+
   // 处理答案（去除HTML标签）
   let correctAnswer: string | string[] = "";
   let subQuestions: SubQuestionItem[] | undefined = undefined;
   let answerType2: string | undefined = undefined;
-  
+
   if (question.answer) {
     // 计算分析题（type=8）的特殊处理
     if (typeCode === "8" && question.answer.sub_questions) {
       answerType2 = question.answer.type2;
-      subQuestions = question.answer.sub_questions.map(subQ => ({
+      subQuestions = question.answer.sub_questions.map((subQ) => ({
         calcchild_id: subQ.calcchild_id,
         type: subQ.type,
         content: stripHtmlTags(subQ.content),
         answer: {
-          answer_content: subQ.answer.answer_content 
-            ? stripHtmlTags(subQ.answer.answer_content) 
+          answer_content: subQ.answer.answer_content
+            ? stripHtmlTags(subQ.answer.answer_content)
             : undefined,
-          option_true: subQ.answer.option_true 
-            ? stripHtmlTags(subQ.answer.option_true) 
+          option_true: subQ.answer.option_true
+            ? stripHtmlTags(subQ.answer.option_true)
             : undefined,
         },
-        options: subQ.options 
-          ? subQ.options.map(opt => ({
+        options: subQ.options
+          ? subQ.options.map((opt) => ({
               label: stripHtmlTags(opt.label),
               content: stripHtmlTags(opt.content),
             }))
@@ -334,7 +294,10 @@ function convertQuestion(question: Question): QuestionItem {
         let answerText = "";
         if (subQ.answer.option_true) {
           // 如果是选项答案（可能包含多个选项，用逗号等分隔）
-          const options = String(subQ.answer.option_true).split(/[,，、\s]+/).map(v => v.trim()).filter(v => v);
+          const options = String(subQ.answer.option_true)
+            .split(/[,，、\s]+/)
+            .map((v) => v.trim())
+            .filter((v) => v);
           answerText = options.join("、"); // 多个选项用顿号连接
         } else if (subQ.answer.answer_content) {
           answerText = subQ.answer.answer_content;
@@ -353,7 +316,9 @@ function convertQuestion(question: Question): QuestionItem {
       // 普通题型的答案处理
       if (question.answer.correct_answer) {
         if (Array.isArray(question.answer.correct_answer)) {
-          correctAnswer = question.answer.correct_answer.map(ans => stripHtmlTags(ans));
+          correctAnswer = question.answer.correct_answer.map((ans) =>
+            stripHtmlTags(ans)
+          );
         } else {
           correctAnswer = stripHtmlTags(question.answer.correct_answer);
         }
@@ -368,7 +333,7 @@ function convertQuestion(question: Question): QuestionItem {
   // 处理选项（去除HTML标签）
   let options: Array<{ label: string; content: string }> | string[] = [];
   if (question.options && question.options.length > 0) {
-    options = question.options.map(opt => ({
+    options = question.options.map((opt) => ({
       label: stripHtmlTags(opt.label),
       content: stripHtmlTags(opt.content),
     }));
@@ -426,7 +391,11 @@ const columns = computed<Column[]>(() => {
       width: 150,
       formatter: (val, row) => {
         // 如果是计算分析题，在编号后显示子题数量
-        if (row.type === "8" && row.subQuestions && row.subQuestions.length > 0) {
+        if (
+          row.type === "8" &&
+          row.subQuestions &&
+          row.subQuestions.length > 0
+        ) {
           return `${val} (${row.subQuestions.length}道子题)`;
         }
         return val;
@@ -495,11 +464,11 @@ const columns = computed<Column[]>(() => {
           const optionsList = Array.isArray(row.options) ? row.options : [];
           return optionsList
             .map((opt: any) => {
-              if (typeof opt === 'string') {
+              if (typeof opt === "string") {
                 return stripHtmlTags(opt);
               }
               // 对于对象类型的选项，只显示content（因为label已经在标签中显示了）
-              return stripHtmlTags(opt.content || '');
+              return stripHtmlTags(opt.content || "");
             })
             .join(" | ");
         }
@@ -514,9 +483,9 @@ const columns = computed<Column[]>(() => {
         if (!val) return "-";
         // 去除HTML标签
         let cleanAnswer: string | string[] = Array.isArray(val)
-          ? val.map(v => stripHtmlTags(String(v)))
+          ? val.map((v) => stripHtmlTags(String(v)))
           : stripHtmlTags(String(val));
-        
+
         // 多选题：显示多个答案，用顿号分隔
         if (row.questionType === "multiple" || row.type === "2") {
           // 如果是数组，直接处理
@@ -524,14 +493,19 @@ const columns = computed<Column[]>(() => {
             return cleanAnswer.join("、");
           }
           // 如果是字符串，支持多种分隔符：逗号、中文逗号、顿号、空格
-          const answers = String(cleanAnswer).split(/[,，、\s]+/).map(v => v.trim()).filter(v => v);
+          const answers = String(cleanAnswer)
+            .split(/[,，、\s]+/)
+            .map((v) => v.trim())
+            .filter((v) => v);
           if (answers.length > 0) {
             return answers.join("、");
           }
           return String(cleanAnswer);
         }
         // 单选题：显示单个选项字母
-        return Array.isArray(cleanAnswer) ? cleanAnswer.join("、") : String(cleanAnswer);
+        return Array.isArray(cleanAnswer)
+          ? cleanAnswer.join("、")
+          : String(cleanAnswer);
       },
     });
   } else if (selectedType.value === "4") {
@@ -546,14 +520,18 @@ const columns = computed<Column[]>(() => {
         let cleanAnswer: string;
         if (Array.isArray(val)) {
           // 如果是数组，每个答案一行
-          cleanAnswer = val.map(v => stripHtmlTags(String(v))).join("\n");
+          cleanAnswer = val.map((v) => stripHtmlTags(String(v))).join("\n");
         } else {
           // 如果是字符串，检查是否包含分隔符（逗号、中文逗号、顿号、分号等）
           const answerStr = stripHtmlTags(String(val));
           // 检查是否包含多个答案的分隔符
           if (/[,，、;；\n]/.test(answerStr)) {
             // 按分隔符分割，每个答案一行
-            cleanAnswer = answerStr.split(/[,，、;；\n]+/).map(v => v.trim()).filter(v => v).join("\n");
+            cleanAnswer = answerStr
+              .split(/[,，、;；\n]+/)
+              .map((v) => v.trim())
+              .filter((v) => v)
+              .join("\n");
           } else {
             cleanAnswer = answerStr;
           }
@@ -576,10 +554,22 @@ const columns = computed<Column[]>(() => {
         // 去除HTML标签后再判断
         const cleanAnswer = stripHtmlTags(String(val));
         const answerStr = cleanAnswer.toLowerCase().trim();
-        if (answerStr === "true" || answerStr === "对" || answerStr === "正确" || answerStr === "1" || answerStr === "yes") {
+        if (
+          answerStr === "true" ||
+          answerStr === "对" ||
+          answerStr === "正确" ||
+          answerStr === "1" ||
+          answerStr === "yes"
+        ) {
           return "对";
         }
-        if (answerStr === "false" || answerStr === "错" || answerStr === "错误" || answerStr === "0" || answerStr === "no") {
+        if (
+          answerStr === "false" ||
+          answerStr === "错" ||
+          answerStr === "错误" ||
+          answerStr === "0" ||
+          answerStr === "no"
+        ) {
           return "错";
         }
         return cleanAnswer;
@@ -592,7 +582,7 @@ const columns = computed<Column[]>(() => {
       label: "正确答案",
       minWidth: 400,
       align: "left",
-      formatter: (val, row) => {
+      formatter: (val) => {
         if (!val) return "-";
         // 答案已经在 convertQuestion 中格式化为（1）答案1\n（2）答案2...的格式（使用换行符分隔）
         // 在表格中，换行符会被渲染为换行
@@ -608,20 +598,6 @@ const columns = computed<Column[]>(() => {
         return answerStr;
       },
     });
-  } else if (selectedType.value === "") {
-    // 简答题/论述题：显示参考答案
-    baseColumns.push({
-      prop: "correctAnswer",
-      label: "参考答案",
-      minWidth: 300,
-      align: "left",
-      formatter: (val) => {
-        if (typeof val === "string" && val.length > 100) {
-          return val.substring(0, 100) + "...";
-        }
-        return val || "-";
-      },
-    });
   } else if (!selectedType.value) {
     // 如果选择"全部"，根据每行的题目类型动态显示答案列
     // 这里简化处理，显示一个通用的答案列
@@ -635,14 +611,29 @@ const columns = computed<Column[]>(() => {
         // 根据题目类型格式化答案
         if (row.questionType === "judge" || row.type === "3") {
           const answerStr = String(val).toLowerCase().trim();
-          if (answerStr === "true" || answerStr === "对" || answerStr === "正确" || answerStr === "1" || answerStr === "yes") {
+          if (
+            answerStr === "true" ||
+            answerStr === "对" ||
+            answerStr === "正确" ||
+            answerStr === "1" ||
+            answerStr === "yes"
+          ) {
             return "对";
           }
-          if (answerStr === "false" || answerStr === "错" || answerStr === "错误" || answerStr === "0" || answerStr === "no") {
+          if (
+            answerStr === "false" ||
+            answerStr === "错" ||
+            answerStr === "错误" ||
+            answerStr === "0" ||
+            answerStr === "no"
+          ) {
             return "错";
           }
         } else if (row.questionType === "multiple" || row.type === "2") {
-          const answers = val.split(/[,，、\s]+/).map(v => v.trim()).filter(v => v);
+          const answers = val
+            .split(/[,，、\s]+/)
+            .map((v: string) => v.trim())
+            .filter((v: string) => v);
           if (answers.length > 0) {
             return answers.join("、");
           }
@@ -705,8 +696,8 @@ const columns = computed<Column[]>(() => {
 });
 
 // 题目类型选项（使用后端题型代码）
-// 注意：暂时禁用"全部"选项，只显示具体题型
 const questionTypes = [
+  { label: "全部", value: "" },
   { label: "单选题", value: "1" },
   { label: "多选题", value: "2" },
   { label: "判断题", value: "3" },
@@ -714,8 +705,8 @@ const questionTypes = [
   { label: "计算分析题", value: "8" },
 ];
 
-// 默认选择第一个类型（单选题）
-const selectedType = ref<string>("1");
+// 默认选择第一个类型（全部）
+const selectedType = ref<string>("");
 
 // 将表格列配置转换为 TableToolBar 需要的格式（排除操作列）
 const tableToolBarColumns = computed<IColumn[]>(() => {
@@ -731,9 +722,7 @@ const tableToolBarColumns = computed<IColumn[]>(() => {
 
 // 列显隐状态（排除操作列）
 const checkedCols = ref<string[]>(
-  columns.value
-    .filter((col) => !col.actionButtons)
-    .map((col) => col.prop)
+  columns.value.filter((col) => !col.actionButtons).map((col) => col.prop)
 );
 
 // 监听 columns 变化，更新 checkedCols
@@ -754,13 +743,6 @@ watch(
   { immediate: true }
 );
 
-// 根据 checkedCols 过滤显示的列（操作列始终显示）
-const visibleColumns = computed(() => {
-  return columns.value.filter((col) => {
-    if (col.actionButtons) return true;
-    return checkedCols.value.includes(col.prop);
-  });
-});
 
 /* ===================== 状态 ===================== */
 const { loading, withLoading } = useLoading();
@@ -771,6 +753,49 @@ const tableData = ref<QuestionItem[]>([]);
 const searchKeyword = ref("");
 const advSearchParams = ref<Record<string, any>>({});
 const tableToolBarRef = ref<InstanceType<typeof TableToolBar>>();
+
+/* ===================== 主视图模式 ===================== */
+const mainViewMode = ref<"table" | "statistics">("table"); // 主视图模式：题目表格或统计数据
+
+/* ===================== 统计数据 ===================== */
+const loadingStatistics = ref(false);
+const activeStatTab = ref<"type" | "subject">("type");
+const statViewMode = ref<"table" | "chart">("table"); // 统计视图模式：表格或图表
+const typeStatistics = ref<StatisticsItem[]>([]);
+const subjectStatistics = ref<StatisticsItem[]>([]);
+const totalCount = ref(0);
+
+// 获取统计数据
+async function fetchStatistics() {
+  loadingStatistics.value = true;
+  try {
+    // 获取按题型统计
+    const typeResponse = await getQuestionStatistics({ group_by: "type" });
+    if (typeResponse.success && typeResponse.data) {
+      typeStatistics.value = typeResponse.data.statistics || [];
+      totalCount.value = typeResponse.data.total || 0;
+    }
+
+    // 获取按科目统计
+    const subjectResponse = await getQuestionStatistics({
+      group_by: "subject",
+    });
+    if (subjectResponse.success && subjectResponse.data) {
+      subjectStatistics.value = subjectResponse.data.statistics || [];
+      // 如果题型统计没有总数，使用科目统计的总数
+      if (!totalCount.value) {
+        totalCount.value = subjectResponse.data.total || 0;
+      }
+    }
+  } catch (error: unknown) {
+    console.error("获取统计数据失败:", error);
+    const message =
+      error instanceof Error ? error.message : "获取统计数据失败";
+    ElMessage.error(message);
+  } finally {
+    loadingStatistics.value = false;
+  }
+}
 
 /* ===================== 事件处理 ===================== */
 function onAdd() {
@@ -799,7 +824,7 @@ function onSearch(kw: string) {
   fetchData();
 }
 
-function onAdvSearch(payload: Record<string, any>) {
+function onAdvSearch(payload: Record<string, unknown>) {
   advSearchParams.value = { ...payload };
   page.value = 1;
   fetchData();
@@ -812,29 +837,28 @@ function onColumnChange(cols: string[]) {
 function handleReset() {
   searchKeyword.value = "";
   advSearchParams.value = {};
-  selectedType.value = "1"; // 重置为默认类型（单选题）
+  selectedType.value = ""; // 重置为默认类型（全部）
   page.value = 1;
   fetchData();
 }
 
 /* ===================== 数据获取 ===================== */
 async function fetchData() {
-  // 如果没有选择题型，不能调用接口（type是必填参数）
-  if (!selectedType.value) {
-    ElMessage.warning("请选择题目类型");
-    return;
-  }
-
   await withLoading(async () => {
     try {
       // 构建查询参数
-      const params: any = {
-        type: selectedType.value, // 必填参数
+      const params: QuestionListParams = {
         page: page.value,
         page_size: pageSize.value,
         include_answer: true,
         include_analysis: true,
       };
+
+      // 如果选择了具体题型，才添加 type 参数
+      // 如果选择"全部"（selectedType.value 为空字符串），则不传 type 参数
+      if (selectedType.value) {
+        params.type = selectedType.value;
+      }
 
       // 添加搜索关键字参数（搜索题目内容）
       if (searchKeyword.value && searchKeyword.value.trim()) {
@@ -843,7 +867,10 @@ async function fetchData() {
 
       // 添加高级搜索参数
       // 高级搜索中的题目内容字段
-      if (advSearchParams.value.content && advSearchParams.value.content.trim()) {
+      if (
+        advSearchParams.value.content &&
+        advSearchParams.value.content.trim()
+      ) {
         params.keyword = advSearchParams.value.content.trim();
       }
 
@@ -886,9 +913,10 @@ async function fetchData() {
         tableData.value = [];
         total.value = 0;
       }
-    } catch (error: any) {
-      console.error('获取题目列表失败:', error);
-      ElMessage.error(error.message || "数据加载失败");
+    } catch (error: unknown) {
+      console.error("获取题目列表失败:", error);
+      // 注意：错误消息已经在响应拦截器中显示，这里不再重复显示
+      // 只处理数据状态
       tableData.value = [];
       total.value = 0;
       throw error; // 重新抛出错误，让 withLoading 处理
@@ -896,14 +924,15 @@ async function fetchData() {
   });
 }
 
-
 /* ===================== 生命周期 ===================== */
 onMounted(() => {
   // 获取题库名称（可以从路由参数或API获取）
   bankName.value = `题库 ${bankId.value}`;
   // 注意：虽然显示了题库ID，但后端暂时不区分，所有题库都返回相同数据
-  // 默认选择第一个类型（单选题），并自动加载数据
+  // 默认选择"全部"，并自动加载数据
   fetchData();
+  // 获取统计数据
+  fetchStatistics();
 });
 
 // 注册页面刷新功能
@@ -919,6 +948,20 @@ usePageRefresh(fetchData);
   display: flex;
   flex-direction: column;
   gap: 16px;
+  overflow-y: auto; // 允许垂直滚动
+  min-height: 0; // 确保flex布局正常工作
+
+  // 确保所有子元素都能正常显示
+  > * {
+    flex-shrink: 0; // 默认不收缩
+  }
+
+  .content-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
 }
 
 .page-header {
@@ -934,54 +977,14 @@ usePageRefresh(fetchData);
   }
 }
 
-.type-filter-bar {
+.toolbar-section {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  background: #f8f9fa;
-  border-radius: 6px;
-  margin-bottom: 16px;
+  gap: 16px;
 
-  .type-label {
-    font-size: 14px;
-    font-weight: 500;
-    color: #606266;
-    white-space: nowrap;
+  .view-toggle {
+    flex-shrink: 0;
   }
-
-  .type-buttons {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-}
-
-.data-table {
-  flex: 1;
-  border: 1px solid #ebeef5;
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.action-group {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-}
-
-.pagination-bar {
-  display: flex;
-  justify-content: flex-end;
-  padding: 8px 0;
-}
-
-/* 多行答案样式：支持换行显示（填空题和计算分析题） */
-.multi-line-answer {
-  white-space: pre-line;
-  word-break: break-word;
-  line-height: 1.6;
-  display: block;
 }
 </style>
-

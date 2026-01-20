@@ -130,6 +130,11 @@ import { ArrowLeft } from "@element-plus/icons-vue";
 import TableToolBar from "@/components/tableToolBar/index.vue";
 import QuestionDetailDialog from "../detail/components/QuestionDetailDialog.vue";
 import QuestionEditDialog from "../detail/components/QuestionEditDialog.vue";
+import {
+  formatDate,
+  formatDifficulty,
+  formatSubject,
+} from "@/utils/formatters";
 
 // TableToolBar 列配置类型
 interface IColumn {
@@ -206,39 +211,12 @@ const questionTypes = [
 ];
 
 /* ===================== 工具函数 ===================== */
-const formatDate = (d: string | Date) => {
-  const date = new Date(d);
-  const Y = date.getFullYear();
-  const M = String(date.getMonth() + 1).padStart(2, "0");
-  const D = String(date.getDate()).padStart(2, "0");
-  const h = String(date.getHours()).padStart(2, "0");
-  const m = String(date.getMinutes()).padStart(2, "0");
-  return `${Y}-${M}-${D} ${h}:${m}`;
-};
-
-const formatDifficulty = (difficulty: string) => {
-  const difficultyMap: Record<string, string> = {
-    easy: "简单",
-    medium: "中等",
-    hard: "困难",
-  };
-  return difficultyMap[difficulty] || difficulty;
-};
-
-const formatSubject = (subject: string) => {
-  const subjectMap: Record<string, string> = {
-    math: "数学",
-    chinese: "语文",
-    english: "英语",
-    physics: "物理",
-    chemistry: "化学",
-    biology: "生物",
-    history: "历史",
-    geography: "地理",
-    politics: "政治",
-  };
-  return subjectMap[subject] || subject;
-};
+// 导入格式化工具函数
+import {
+  formatDate,
+  formatDifficulty,
+  formatSubject,
+} from "@/utils/formatters";
 
 /* ===================== 业务方法 ===================== */
 const showDetailDialog = ref(false);

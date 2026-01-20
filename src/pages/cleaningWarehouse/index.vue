@@ -151,6 +151,7 @@ import {
   resumeDedupTask,
   type DedupTask,
   type TaskStatus,
+  type GetTasksParams,
 } from "@/api/dedup";
 import {
   socketManager,
@@ -158,6 +159,16 @@ import {
   type TaskCompletedData,
   type TaskErrorData,
 } from "@/utils/socket";
+import { createLogger } from "@/utils/logger";
+import {
+  formatDate,
+  formatStatus,
+  formatProgress,
+} from "@/utils/formatters";
+import { useDebounceFn } from "@/utils/debounce";
+
+// 创建日志记录器
+const log = createLogger("cleaningWarehouse/index.vue");
 
 const router = useRouter();
 
@@ -194,37 +205,6 @@ interface Column {
   options?: { label: string; value: string | number }[];
 }
 
-// 工具函数
-const formatDate = (d: string | Date | null | undefined) => {
-  if (!d) return "-";
-  const date = new Date(d);
-  const Y = date.getFullYear();
-  const M = String(date.getMonth() + 1).padStart(2, "0");
-  const D = String(date.getDate()).padStart(2, "0");
-  const h = String(date.getHours()).padStart(2, "0");
-  const m = String(date.getMinutes()).padStart(2, "0");
-  return `${Y}-${M}-${D} ${h}:${m}`;
-};
-
-const formatStatus = (status: TaskStatus) => {
-  const statusMap: Record<TaskStatus, { text: string; type: string }> = {
-    pending: { text: "待启动", type: "info" },
-    running: { text: "运行中", type: "warning" },
-    paused: { text: "已暂停", type: "warning" },
-    completed: { text: "已完成", type: "success" },
-    error: { text: "错误", type: "danger" },
-    cancelled: { text: "已取消", type: "info" },
-  };
-  return statusMap[status] || { text: status, type: "info" };
-};
-
-const formatProgress = (percentage: number | null | undefined) => {
-  if (percentage == null || isNaN(percentage)) {
-    return "-";
-  }
-  return `${percentage.toFixed(1)}%`;
-};
-
 // 业务方法
 function handleViewDetail(row: DedupTask) {
   router.push({
@@ -234,13 +214,48 @@ function handleViewDetail(row: DedupTask) {
 }
 
 async function handleStart(row: DedupTask) {
+  log("handleStart called", {
+    taskId: row.id,
+    currentStatus: row.status,
+    isAlreadyStarting: startingTasks.value.has(row.id),
+  }, "A");
+  
+  // 防止重复启动
+  if (startingTasks.value.has(row.id)) {
+    log("Prevented duplicate start", {
+      taskId: row.id,
+      status: row.status,
+    }, "A");
+    ElMessage.warning("任务正在启动中，请勿重复操作");
+    return;
+  }
+  
+  // 检查任务状态
+  if (row.status !== "pending") {
+    log("Invalid status for start", {
+      taskId: row.id,
+      status: row.status,
+      expectedStatus: "pending",
+    }, "C");
+    ElMessage.warning(`任务状态为 ${row.status}，无法启动`);
+    return;
+  }
+  
+  startingTasks.value.add(row.id);
   try {
     await ElMessageBox.confirm("确定要启动此任务吗？", "提示", {
       confirmButtonText: "确定",
       cancelButtonText: "取消",
       type: "warning",
     });
+    log("Before startDedupTask API call", {
+      taskId: row.id,
+      status: row.status,
+    }, "A");
     await startDedupTask(row.id);
+    log("After startDedupTask API call success", {
+      taskId: row.id,
+    }, "A");
     ElMessage.success("任务已启动");
     
     // 加入该任务的 WebSocket 房间以接收实时进度
@@ -248,9 +263,16 @@ async function handleStart(row: DedupTask) {
     
     fetchData();
   } catch (error: any) {
+    log("handleStart error", {
+      taskId: row.id,
+      error: error.message,
+      status: row.status,
+    }, "A");
     if (error !== "cancel") {
       ElMessage.error(error.message || "启动任务失败");
     }
+  } finally {
+    startingTasks.value.delete(row.id);
   }
 }
 
@@ -311,13 +333,57 @@ async function handlePause(row: DedupTask) {
 }
 
 async function handleResume(row: DedupTask) {
+  log("handleResume called", {
+    taskId: row.id,
+    currentStatus: row.status,
+    processedGroups: row.processed_groups,
+    totalGroups: row.total_groups,
+    isAlreadyResuming: resumingTasks.value.has(row.id),
+  }, "B");
+  
+  // 防止重复恢复
+  if (resumingTasks.value.has(row.id)) {
+    log("Prevented duplicate resume", {
+      taskId: row.id,
+      status: row.status,
+    }, "B");
+    ElMessage.warning("任务正在恢复中，请勿重复操作");
+    return;
+  }
+  
+  // 检查任务状态 - 只允许 paused 状态的任务恢复
+  if (row.status !== "paused") {
+    log("Invalid status for resume", {
+      taskId: row.id,
+      status: row.status,
+      expectedStatus: "paused",
+    }, "C");
+    ElMessage.warning(`任务状态为 ${row.status}，无法恢复。只有暂停状态的任务才能恢复。`);
+    // 如果状态不是 paused，刷新数据以确保状态同步
+    fetchData();
+    return;
+  }
+  
+  resumingTasks.value.add(row.id);
   try {
     await ElMessageBox.confirm("确定要继续此任务吗？", "提示", {
       confirmButtonText: "确定",
       cancelButtonText: "取消",
       type: "warning",
     });
+    log("Before resumeDedupTask API call", {
+      taskId: row.id,
+      status: row.status,
+      processedGroups: row.processed_groups,
+      totalGroups: row.total_groups,
+    }, "B");
     const result = await resumeDedupTask(row.id);
+    log("After resumeDedupTask API call success", {
+      taskId: row.id,
+      newStatus: result.data?.status,
+      processedGroups: result.data?.processed_groups,
+      totalGroups: result.data?.total_groups,
+    }, "B");
     ElMessage.success("任务已恢复运行");
     
     // 更新任务状态
@@ -333,10 +399,29 @@ async function handleResume(row: DedupTask) {
     
     fetchData();
   } catch (error: any) {
+    log("handleResume error", {
+      taskId: row.id,
+      error: error.message,
+      status: row.status,
+      processedGroups: row.processed_groups,
+      isDuplicateError: error.message?.includes("Duplicate entry") || error.message?.includes("uk_task_question"),
+    }, "B");
     if (error !== "cancel") {
-      // 检查是否是数据库错误
       const errorMessage = error.message || "";
-      if (
+      const isDuplicateError = errorMessage.includes("Duplicate entry") || 
+                               errorMessage.includes("uk_task_question") ||
+                               errorMessage.includes("IntegrityError");
+      
+      if (isDuplicateError) {
+        ElMessage.error({
+          message: `恢复任务失败：检测到重复数据。这通常是因为任务被重复恢复导致的。请刷新页面查看最新状态。`,
+          duration: 5000,
+        });
+        // 刷新任务列表
+        setTimeout(() => {
+          fetchData();
+        }, 1000);
+      } else if (
         errorMessage.includes("Data truncated") ||
         errorMessage.includes("status") ||
         errorMessage.includes("pymysql")
@@ -349,6 +434,8 @@ async function handleResume(row: DedupTask) {
         ElMessage.error(errorMessage || "恢复任务失败");
       }
     }
+  } finally {
+    resumingTasks.value.delete(row.id);
   }
 }
 
@@ -464,7 +551,13 @@ const columns = ref<Column[]>([
           {
             text: "启动",
             type: "success",
-            click: handleStart,
+            click: () => {
+              log("Start button clicked", {
+                taskId: row.id,
+                status: row.status,
+              }, "C");
+              handleStart(row);
+            },
           },
           {
             text: "删除",
@@ -492,7 +585,15 @@ const columns = ref<Column[]>([
           {
             text: "继续",
             type: "success",
-            click: handleResume,
+            click: () => {
+              log("Resume button clicked", {
+                taskId: row.id,
+                status: row.status,
+                processedGroups: row.processed_groups,
+                totalGroups: row.total_groups,
+              }, "B");
+              handleResume(row);
+            },
           },
           {
             text: "取消",
@@ -570,59 +671,52 @@ const total = ref(0);
 const tableData = ref<DedupTask[]>([]);
 const showCreateDialog = ref(false);
 const creating = ref(false);
+const startingTasks = ref<Set<number>>(new Set()); // 正在启动的任务ID集合
+const resumingTasks = ref<Set<number>>(new Set()); // 正在恢复的任务ID集合
 const createForm = ref({
   task_name: "",
   analysis_type: "full",
   similarity_threshold: 0.8,
 });
 
-// 数据获取
+// 数据获取（优化：将搜索和筛选改为后端处理）
 async function fetchData() {
   await withLoading(async () => {
     try {
-      const params: any = {
+      const params: GetTasksParams = {
         page: page.value,
         page_size: pageSize.value,
       };
+
+      // 关键词搜索（搜索任务名称）- 改为后端搜索
+      if (searchKeyword.value && searchKeyword.value.trim()) {
+        params.task_name = searchKeyword.value.trim();
+      }
 
       // 状态筛选
       if (advSearchParams.value.status) {
         params.status = advSearchParams.value.status;
       }
 
+      // 高级搜索：创建时间范围 - 改为后端搜索
+      if (
+        advSearchParams.value.created_at &&
+        Array.isArray(advSearchParams.value.created_at) &&
+        advSearchParams.value.created_at.length === 2
+      ) {
+        const [start, end] = advSearchParams.value.created_at;
+        if (start && end) {
+          params.created_at_start = start;
+          params.created_at_end = end;
+        }
+      }
+
       const response = await getDedupTasks(params);
 
       if (response.success && response.data) {
-        let filteredList = [...response.data.list];
-
-        // 关键词搜索（搜索任务名称）
-        if (searchKeyword.value) {
-          const keyword = searchKeyword.value.toLowerCase();
-          filteredList = filteredList.filter((task) =>
-            task.task_name.toLowerCase().includes(keyword)
-          );
-        }
-
-        // 高级搜索：创建时间范围
-        if (
-          advSearchParams.value.created_at &&
-          Array.isArray(advSearchParams.value.created_at) &&
-          advSearchParams.value.created_at.length === 2
-        ) {
-          const [start, end] = advSearchParams.value.created_at;
-          if (start && end) {
-            const startDate = new Date(start);
-            const endDate = new Date(end);
-            endDate.setHours(23, 59, 59, 999);
-            filteredList = filteredList.filter((task) => {
-              const date = new Date(task.created_at);
-              return date >= startDate && date <= endDate;
-            });
-          }
-        }
-
-        tableData.value = filteredList;
-        total.value = response.data.pagination.total;
+        // 直接使用后端返回的数据，不再在前端过滤
+        tableData.value = response.data.list || [];
+        total.value = response.data.pagination?.total || 0;
       } else {
         tableData.value = [];
         total.value = 0;
@@ -636,6 +730,12 @@ async function fetchData() {
     }
   });
 }
+
+// 使用防抖优化搜索
+const debouncedFetchData = useDebounceFn(() => {
+  page.value = 1;
+  fetchData();
+}, 500);
 
 // 重置所有筛选条件
 function handleReset() {
@@ -666,12 +766,13 @@ function onExport() {
   ElMessage.info("导出功能");
 }
 
+// 搜索函数（带防抖）
 function onSearch(kw: string) {
   searchKeyword.value = kw;
-  page.value = 1;
-  fetchData();
+  debouncedFetchData();
 }
 
+// 高级搜索（立即执行，不防抖）
 function onAdvSearch(payload: Record<string, any>) {
   advSearchParams.value = { ...payload };
   page.value = 1;
@@ -720,12 +821,27 @@ function handleCreateDialogClose() {
 
 // WebSocket 处理函数
 function handleTaskProgress(data: TaskProgressData) {
+  log("handleTaskProgress called", {
+    taskId: data.task_id,
+    status: data.status,
+    processedGroups: data.processed_groups,
+    totalGroups: data.total_groups,
+    progressPercentage: data.progress_percentage,
+    currentGroup: data.current_group,
+  }, "D");
+  
   // 更新对应任务的数据
   const taskIndex = tableData.value.findIndex(
     (task) => task.id === data.task_id
   );
   if (taskIndex !== -1) {
     const task = tableData.value[taskIndex];
+    log("Before updating task progress", {
+      taskId: data.task_id,
+      previousStatus: task.status,
+      previousProcessedGroups: task.processed_groups,
+      newProcessedGroups: data.processed_groups,
+    }, "D");
     task.status = data.status as TaskStatus;
     task.processed_groups = data.processed_groups;
     task.total_groups = data.total_groups;
@@ -751,17 +867,47 @@ function handleTaskCompleted(data: TaskCompletedData) {
 }
 
 function handleTaskError(data: TaskErrorData) {
+  const isDuplicateError = data.error.includes("Duplicate entry") || 
+                          data.error.includes("uk_task_question") ||
+                          data.error.includes("IntegrityError");
+  
+  log("handleTaskError called", {
+    taskId: data.task_id,
+    error: data.error,
+    isDuplicateError,
+  }, "E");
+  
   // 更新任务为错误状态
   const taskIndex = tableData.value.findIndex(
     (task) => task.id === data.task_id
   );
   if (taskIndex !== -1) {
     const task = tableData.value[taskIndex];
+    log("Before updating task status to error", {
+      taskId: data.task_id,
+      previousStatus: task.status,
+      processedGroups: task.processed_groups,
+      totalGroups: task.total_groups,
+      isDuplicateError,
+    }, "E");
     task.status = "error";
     task.error_message = data.error;
     tableData.value[taskIndex] = { ...task };
   }
-  ElMessage.error(`任务 ${data.task_id} 执行失败: ${data.error}`);
+  
+  // 如果是重复键错误，显示更友好的提示并自动刷新任务状态
+  if (isDuplicateError) {
+    ElMessage.error({
+      message: `任务 ${data.task_id} 执行失败：检测到重复数据。这通常是因为任务被重复启动或恢复导致的。任务状态已更新，请刷新页面查看最新状态。`,
+      duration: 5000,
+    });
+    // 延迟刷新任务列表，确保后端状态已更新
+    setTimeout(() => {
+      fetchData();
+    }, 1000);
+  } else {
+    ElMessage.error(`任务 ${data.task_id} 执行失败: ${data.error}`);
+  }
 }
 
 // 加入所有运行中的任务房间

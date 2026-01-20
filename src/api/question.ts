@@ -49,7 +49,7 @@ export interface Question {
 
 // 题目列表请求参数
 export interface QuestionListParams {
-  type: string // 必填：1=单选, 2=多选, 3=判断, 4=填空, 8=计算分析
+  type?: string // 可选：1=单选, 2=多选, 3=判断, 4=填空, 8=计算分析，不传则查询所有题型
   channel_code?: string
   subject_id?: number
   subject_name?: string

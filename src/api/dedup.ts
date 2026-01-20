@@ -139,6 +139,9 @@ export interface GetTasksParams {
   page?: number;
   page_size?: number;
   status?: TaskStatus;
+  task_name?: string; // 任务名称搜索（关键词）
+  created_at_start?: string; // 创建时间范围开始（YYYY-MM-DD 格式）
+  created_at_end?: string; // 创建时间范围结束（YYYY-MM-DD 格式）
 }
 
 // 创建任务参数
@@ -154,6 +157,7 @@ export interface GetExactGroupsParams {
   page_size?: number;
   group_type?: string; // 1=单选, 2=多选, 3=判断, 4=填空, 8=计算分析
   subject_id?: number;
+  question_count?: number; // 题目数量筛选
 }
 
 // 获取相似重复对列表参数
@@ -219,12 +223,18 @@ export async function getDedupTasks(
   params?: GetTasksParams
 ): Promise<TaskListResponse> {
   try {
+    // 构建请求参数，过滤 undefined 和空值
+    const requestParams: Record<string, any> = {
+      page: params?.page || 1,
+      page_size: params?.page_size || 20,
+    };
+    if (params?.status) requestParams.status = params.status;
+    if (params?.task_name) requestParams.task_name = params.task_name;
+    if (params?.created_at_start) requestParams.created_at_start = params.created_at_start;
+    if (params?.created_at_end) requestParams.created_at_end = params.created_at_end;
+    
     const response = await request.get<TaskListResponse>("/dedup/tasks", {
-      params: {
-        page: params?.page || 1,
-        page_size: params?.page_size || 20,
-        ...(params?.status && { status: params.status }),
-      },
+      params: requestParams,
     });
     return response as unknown as TaskListResponse;
   } catch (error: any) {
@@ -360,6 +370,7 @@ export async function getExactGroups(
           page_size: params?.page_size || 20,
           ...(params?.group_type && { group_type: params.group_type }),
           ...(params?.subject_id && { subject_id: params.subject_id }),
+          ...(params?.question_count && { question_count: params.question_count }),
         },
       }
     );
