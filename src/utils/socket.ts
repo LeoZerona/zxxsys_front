@@ -24,7 +24,7 @@ const getWebSocketURL = () => {
 
   // 生产/测试环境：从 VITE_API_BASE_URL 推断基础 URL
   const apiUrl =
-    import.meta.env.VITE_API_BASE_URL || "http://192.168.0.104:5000/api";
+    import.meta.env.VITE_API_BASE_URL || "http://192.168.0.103:5000/api";
   if (apiUrl.startsWith("http")) {
     // 提取基础 URL（去掉 /api）
     const baseUrl = apiUrl.replace("/api", "");
@@ -32,7 +32,7 @@ const getWebSocketURL = () => {
   }
 
   // 默认值
-  return "http://192.168.0.104:5000";
+  return "http://192.168.0.103:5000";
 };
 
 // 任务进度数据类型

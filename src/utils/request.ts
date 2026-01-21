@@ -15,7 +15,7 @@ import type { LoadingInstance } from "element-plus/es/components/loading/src/loa
 // - 测试/生产环境：使用完整 URL
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
-  (import.meta.env.DEV ? "/api" : "http://192.168.0.104:5000/api");
+  (import.meta.env.DEV ? "/api" : "http://192.168.0.103:5000/api");
 
 // 后端服务地址（用于获取实际的服务器地址和端口）
 // 在开发环境下，VITE_API_BASE_URL 可能是相对路径 '/api'，需要使用 VITE_API_TARGET 来获取实际的后端地址
