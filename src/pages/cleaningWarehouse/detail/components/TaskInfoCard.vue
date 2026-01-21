@@ -1,13 +1,38 @@
 <template>
   <div class="task-info-card" v-loading="loading">
     <div class="card-header">
-      <h3>任务信息</h3>
-      <el-tag
-        :type="statusConfig.type"
-        size="large"
-      >
-        {{ statusConfig.text }}
-      </el-tag>
+      <div class="title-wrapper">
+        <h3>任务信息</h3>
+        <el-tag :type="statusConfig.type" size="large">
+          {{ statusConfig.text }}
+        </el-tag>
+      </div>
+      <div class="actions">
+        <el-tooltip
+          content="仅已完成的任务支持二次验证"
+          placement="left"
+          v-if="!canReverify"
+        >
+          <span>
+            <el-button
+              type="primary"
+              size="small"
+              :disabled="!canReverify || loading"
+            >
+              二次验证
+            </el-button>
+          </span>
+        </el-tooltip>
+        <el-button
+          v-else
+          type="primary"
+          size="small"
+          :loading="reverifyLoading"
+          @click="handleReverify"
+        >
+          二次验证
+        </el-button>
+      </div>
     </div>
     <div class="card-body" v-if="taskInfo">
       <div class="info-row">
@@ -96,16 +121,31 @@ interface Props {
   taskInfo: DedupTask | null;
   loading?: boolean;
   currentGroupInfo?: string;
+  // 二次验证加载状态，由父组件控制
+  reverifyLoading?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   loading: false,
   currentGroupInfo: "",
+  reverifyLoading: false,
 });
 
 const statusConfig = computed(() => {
   return formatTaskDetailStatus(props.taskInfo?.status || "");
 });
+
+const emit = defineEmits<{
+  (e: "reverify"): void;
+}>();
+
+// 只有任务完成状态才允许二次验证
+const canReverify = computed(() => props.taskInfo?.status === "completed");
+
+function handleReverify() {
+  if (!canReverify.value || props.loading || props.reverifyLoading) return;
+  emit("reverify");
+}
 </script>
 
 <style lang="scss" scoped>
@@ -122,12 +162,25 @@ const statusConfig = computed(() => {
     margin-bottom: 20px;
     padding-bottom: 16px;
     border-bottom: 1px solid #ebeef5;
+    gap: 16px;
 
-    h3 {
-      margin: 0;
-      font-size: 18px;
-      font-weight: 500;
-      color: #303133;
+    .title-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+
+      h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 500;
+        color: #303133;
+      }
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
   }
 

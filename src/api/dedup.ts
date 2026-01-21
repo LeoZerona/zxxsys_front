@@ -124,6 +124,38 @@ export interface TaskStatistics {
   }>;
 }
 
+// 二次验证请求参数
+export interface ReverifyTaskParams {
+  /**
+   * 验证类型：
+   * - "similar": 只验证相似重复对（默认）
+   * - "all": 验证所有重复对
+   */
+  verification_type?: "similar" | "all";
+  /**
+   * 是否重置任务状态让其重新运行，默认 true
+   */
+  reset_task?: boolean;
+  /**
+   * 批处理大小（1-200），默认 50
+   */
+  batch_size?: number;
+}
+
+// 二次验证响应数据
+export interface ReverifyTaskData {
+  total_pairs: number; // 验证的重复对总数
+  verified_pairs: number; // 验证通过的重复对数
+  filtered_pairs: number; // 被过滤掉的重复对数
+  task_reset: boolean; // 是否重置了任务状态
+  verification_type: "similar" | "all"; // 验证类型
+}
+
+// 二次验证接口响应
+export interface ReverifyTaskResponse extends ApiResponse {
+  data?: ReverifyTaskData;
+}
+
 // 分页信息
 export interface Pagination {
   page: number;
@@ -452,6 +484,31 @@ export async function getTaskStatistics(
       `/dedup/tasks/${taskId}/statistics`
     );
     return response as unknown as TaskStatisticsResponse;
+  } catch (error: any) {
+    throw error;
+  }
+}
+
+/**
+ * 去重任务二次验证
+ */
+export async function reverifyDedupTask(
+  taskId: number,
+  params?: ReverifyTaskParams
+): Promise<ReverifyTaskResponse> {
+  try {
+    const payload: ReverifyTaskParams = {
+      verification_type: params?.verification_type ?? "similar",
+      reset_task: params?.reset_task ?? true,
+      batch_size: params?.batch_size ?? 50,
+    };
+
+    const response = await request.post<ReverifyTaskResponse>(
+      `/dedup/tasks/${taskId}/reverify`,
+      payload
+    );
+
+    return response as unknown as ReverifyTaskResponse;
   } catch (error: any) {
     throw error;
   }
