@@ -14,8 +14,10 @@
     <!-- 任务基本信息 -->
     <TaskInfoCard
       :task-info="taskInfo"
-      :loading="loadingTask"
+      :loading="loadingTask || reverifyLoading"
       :current-group-info="currentGroupInfo"
+      :reverify-loading="reverifyLoading"
+      @reverify="handleReverifyTask"
     />
 
     <!-- 视图切换按钮 -->
@@ -100,7 +102,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import {
   ArrowLeft,
   Document,
@@ -111,6 +113,7 @@ import {
   getTaskStatistics,
   getExactGroups,
   getSimilarPairs,
+  reverifyDedupTask,
   type DedupTask,
   type TaskStatus,
   type ExactDuplicateGroup,
@@ -118,6 +121,7 @@ import {
   type TaskStatistics,
   type GetExactGroupsParams,
   type GetSimilarPairsParams,
+  type ReverifyTaskData,
 } from "@/api/dedup";
 import TaskInfoCard from "./components/TaskInfoCard.vue";
 import DataTableView from "./components/DataTableView.vue";
@@ -139,6 +143,7 @@ const taskId = computed(() => Number(route.params.id));
 
 // 任务信息
 const loadingTask = ref(false);
+const reverifyLoading = ref(false);
 const taskInfo = ref<DedupTask | null>(null);
 const taskName = computed(() => taskInfo.value?.task_name || "");
 const currentGroupInfo = ref<string>("");
@@ -386,6 +391,68 @@ function handleTaskCompleted(data: TaskCompletedData) {
   fetchStatistics();
   fetchExactGroups();
   fetchSimilarPairs();
+}
+
+// 二次验证
+async function handleReverifyTask() {
+  if (!taskId.value || !taskInfo.value) return;
+
+  if (taskInfo.value.status !== "completed") {
+    ElMessage.warning("只有状态为已完成的任务才能进行二次验证");
+    return;
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      "将对已完成的去重任务进行二次验证，过滤误判的重复题目对，并可选择重置任务状态重新运行。确定继续吗？",
+      "二次验证确认",
+      {
+        type: "warning",
+        confirmButtonText: "开始验证",
+        cancelButtonText: "取消",
+      }
+    );
+  } catch {
+    // 用户取消
+    return;
+  }
+
+  reverifyLoading.value = true;
+  try {
+    const response = await reverifyDedupTask(taskId.value, {
+      // 默认：只验证相似重复对，并重置任务状态，批大小 50
+      verification_type: "similar",
+      reset_task: true,
+      batch_size: 50,
+    });
+
+    if (response.success) {
+      const data = (response.data || {}) as ReverifyTaskData;
+      const msg =
+        response.message ||
+        `二次验证完成，共验证 ${data.total_pairs ?? 0} 对重复题目，` +
+          `保留 ${data.verified_pairs ?? 0} 对，过滤 ${data.filtered_pairs ?? 0} 对，` +
+          (data.task_reset ? "任务已重置为待运行状态" : "任务状态未修改");
+
+      ElMessage.success(msg);
+
+      // 验证完成后刷新任务信息、统计和列表
+      await fetchTaskDetail();
+      fetchStatistics();
+      fetchExactGroups();
+      fetchSimilarPairs();
+    } else {
+      ElMessage.error(response.message || "二次验证失败");
+    }
+  } catch (error: any) {
+    const msg =
+      error?.response?.data?.message ||
+      error?.message ||
+      "二次验证失败，请稍后重试";
+    ElMessage.error(msg);
+  } finally {
+    reverifyLoading.value = false;
+  }
 }
 
 function handleTaskError(data: TaskErrorData) {
